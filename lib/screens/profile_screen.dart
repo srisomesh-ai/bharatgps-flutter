@@ -83,11 +83,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppColors.teal, AppColors.teal2])),
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 60),
             child: Row(children: [
-              Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)), child: const Icon(Icons.location_on, color: AppColors.teal, size: 22)),
+              Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)), padding: const EdgeInsets.all(3), child: Image.asset('assets/logo-icon.png', errorBuilder: (_, __, ___) => const Icon(Icons.location_on, color: AppColors.teal, size: 20))),
               const SizedBox(width: 9),
               const Text('Bharat GPS Tracker', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
               const Spacer(),
-              IconButton(onPressed: () => Navigator.pushReplacementNamed(context, '/alerts'), icon: const Icon(Icons.notifications_none, color: Colors.white)),
+              IconButton(onPressed: () => Navigator.pushReplacementNamed(context, '/alerts'), icon: const Icon(Icons.notifications_none, color: Colors.white), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+              const SizedBox(width: 12),
+              IconButton(onPressed: () => _soon('Settings'), icon: const Icon(Icons.settings_outlined, color: Colors.white), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
             ]),
           ),
           Expanded(
