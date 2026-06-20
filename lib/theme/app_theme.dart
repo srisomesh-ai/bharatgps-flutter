@@ -86,3 +86,13 @@ String agoText(dynamic ts) {
   final d = (s / 86400).floor();
   return '$d day${d > 1 ? 's' : ''} ago';
 }
+
+// parse server flag "true"/"false"/bool/null
+bool? tBool(dynamic v) {
+  if (v == true || v == false) return v as bool;
+  if (v == null) return null;
+  final s = v.toString().toLowerCase();
+  if (s == 'true' || s == '1' || s == 'on') return true;
+  if (s == 'false' || s == '0' || s == 'off') return false;
+  return null;
+}
