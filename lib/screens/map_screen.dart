@@ -19,6 +19,7 @@ class _MapScreenState extends State<MapScreen> {
   dynamic _focusId;
   String _search = '';
   bool _satellite = false;
+  Map<String, dynamic>? _selected; // for the mini-card
 
   @override
   void initState() {
@@ -44,7 +45,7 @@ class _MapScreenState extends State<MapScreen> {
       final u = _devices.firstWhere((e) => '${e['id']}' == '$_focusId', orElse: () => {});
       if (u.isNotEmpty && u['lat'] != null) {
         _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 15);
-        WidgetsBinding.instance.addPostFrameCallback((_) => _openDetail(u));
+        setState(() => _selected = u);
       }
     }
   }
@@ -57,23 +58,24 @@ class _MapScreenState extends State<MapScreen> {
   double _toD(dynamic v) => double.tryParse('$v') ?? 0;
 
   List<Marker> _markers() {
-    return _devices.where((u) => u['lat'] != null && u['lng'] != null).map((u) {
+    final visible = _devices.where((u) {
+      if (u['lat'] == null || u['lng'] == null) return false;
+      if (_search.isEmpty) return true;
+      return (u['name'] ?? '').toString().toLowerCase().contains(_search);
+    });
+    return visible.map((u) {
       final s = stateOf(u['online'], u['speed']);
+      final heading = (_toD(u['course'])).toDouble();
       return Marker(
         point: LatLng(_toD(u['lat']), _toD(u['lng'])),
-        width: 44,
-        height: 44,
+        width: 90,
+        height: 90,
         child: GestureDetector(
-          onTap: () => _openDetail(u),
-          child: Container(
-            decoration: BoxDecoration(
-              color: stateColor(s),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
-              boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 6)],
-            ),
-            child: const Icon(Icons.local_shipping, color: Colors.white, size: 20),
-          ),
+          onTap: () {
+            setState(() => _selected = u);
+            _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), _map.camera.zoom < 13 ? 14 : _map.camera.zoom);
+          },
+          child: _VehicleMarker(device: u, state: s, heading: heading),
         ),
       );
     }).toList();
@@ -123,7 +125,6 @@ class _MapScreenState extends State<MapScreen> {
                 const Icon(Icons.filter_list, color: Colors.white, size: 23),
               ]),
               const SizedBox(height: 12),
-              // search bar
               Container(
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
                 child: TextField(
@@ -169,7 +170,11 @@ class _MapScreenState extends State<MapScreen> {
             child: Stack(children: [
               FlutterMap(
                 mapController: _map,
-                options: MapOptions(initialCenter: center, initialZoom: _devices.isEmpty ? 5 : 12),
+                options: MapOptions(
+                  initialCenter: center,
+                  initialZoom: _devices.isEmpty ? 5 : 12,
+                  onTap: (_, __) => setState(() => _selected = null),
+                ),
                 children: [
                   TileLayer(
                     urlTemplate: _satellite
@@ -181,7 +186,17 @@ class _MapScreenState extends State<MapScreen> {
                   MarkerLayer(markers: _markers()),
                 ],
               ),
-              if (_loading) const Center(child: CircularProgressIndicator(color: AppColors.teal)),
+              if (_loading)
+                Container(
+                  color: AppColors.bg,
+                  child: const Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      CircularProgressIndicator(color: AppColors.teal),
+                      SizedBox(height: 14),
+                      Text('Loading live map…', style: TextStyle(color: AppColors.muted, fontSize: 16)),
+                    ]),
+                  ),
+                ),
               // floating controls
               Positioned(
                 right: 14, top: 16,
@@ -204,11 +219,77 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ]),
               ),
+              // ===== MINI-CARD (bottom) =====
+              if (_selected != null) _miniCard(_selected!),
             ]),
           ),
         ],
       ),
       bottomNavigationBar: const BottomNav(current: 2),
+    );
+  }
+
+  Widget _miniCard(Map<String, dynamic> u) {
+    final s = stateOf(u['online'], u['speed']);
+    final addr = (u['address'] ?? '').toString().isNotEmpty ? u['address'].toString() : '${u['lat']}, ${u['lng']}';
+    final gps = s == 'of' ? 'Lost' : 'Strong';
+    return Positioned(
+      left: 12, right: 12, bottom: 12,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: const [BoxShadow(color: Color(0x290E5C5C), blurRadius: 24)]),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Center(child: Container(width: 38, height: 4, margin: const EdgeInsets.only(bottom: 12), decoration: BoxDecoration(color: const Color(0xFFD8E0DE), borderRadius: BorderRadius.circular(3)))),
+          Row(children: [
+            Container(width: 72, height: 58, decoration: BoxDecoration(color: const Color(0xFFEDF2F1), borderRadius: BorderRadius.circular(12)), child: Center(child: vehicleThumb(u['icon_url'], size: 60))),
+            const SizedBox(width: 13),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Flexible(child: Text(u['name'] ?? 'Vehicle', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700))),
+                const SizedBox(width: 8),
+                Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3), decoration: BoxDecoration(color: stateBg(s), borderRadius: BorderRadius.circular(20)), child: Text(stateLabels[s]!, style: TextStyle(color: stateColor(s), fontSize: 10, fontWeight: FontWeight.w700))),
+              ]),
+              const SizedBox(height: 5),
+              Row(children: [
+                const Icon(Icons.place, size: 12, color: AppColors.teal),
+                const SizedBox(width: 5),
+                Flexible(child: Text(addr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: AppColors.muted))),
+              ]),
+            ])),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: () => _openDetail(u),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11))),
+              child: Row(mainAxisSize: MainAxisSize.min, children: const [
+                Text('View Details', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                SizedBox(width: 6),
+                Icon(Icons.arrow_forward, size: 15),
+              ]),
+            ),
+          ]),
+          Container(
+            margin: const EdgeInsets.only(top: 11),
+            padding: const EdgeInsets.only(top: 11),
+            decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.line))),
+            child: Row(children: [
+              const Icon(Icons.speed, size: 14, color: AppColors.teal),
+              const SizedBox(width: 5),
+              Text(s == 'of' ? '—' : '${u['speed'] ?? 0} km/h', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.ink2)),
+              Container(width: 1, height: 13, margin: const EdgeInsets.symmetric(horizontal: 10), color: AppColors.line),
+              const Icon(Icons.schedule, size: 14, color: AppColors.teal),
+              const SizedBox(width: 5),
+              Text(agoText(u['time']), style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.ink2)),
+              Container(width: 1, height: 13, margin: const EdgeInsets.symmetric(horizontal: 10), color: AppColors.line),
+              const Icon(Icons.gps_fixed, size: 14, color: AppColors.teal),
+              const SizedBox(width: 5),
+              RichText(text: TextSpan(style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.ink2), children: [
+                const TextSpan(text: 'GPS '),
+                TextSpan(text: gps, style: TextStyle(color: gps == 'Strong' ? AppColors.green : AppColors.red, fontWeight: FontWeight.w800)),
+              ])),
+            ]),
+          ),
+        ]),
+      ),
     );
   }
 
@@ -235,6 +316,87 @@ class _MapScreenState extends State<MapScreen> {
   }
 }
 
+// ===== Custom vehicle marker (plate above, pic center, tag below, live pulse) =====
+class _VehicleMarker extends StatefulWidget {
+  final Map<String, dynamic> device;
+  final String state;
+  final double heading;
+  const _VehicleMarker({required this.device, required this.state, required this.heading});
+  @override
+  State<_VehicleMarker> createState() => _VehicleMarkerState();
+}
+
+class _VehicleMarkerState extends State<_VehicleMarker> with SingleTickerProviderStateMixin {
+  AnimationController? _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.state == 'rn') {
+      _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.state;
+    final u = widget.device;
+    final tagText = s == 'rn' ? '${u['speed'] ?? 0} km/h' : stateLabels[s]!;
+    return SizedBox(
+      width: 90,
+      height: 90,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // live pulse
+          if (_pulse != null)
+            AnimatedBuilder(
+              animation: _pulse!,
+              builder: (_, __) {
+                final v = _pulse!.value;
+                return Container(
+                  width: 34 * (0.5 + v * 1.7),
+                  height: 34 * (0.5 + v * 1.7),
+                  decoration: BoxDecoration(color: AppColors.green.withOpacity((1 - v) * 0.35), shape: BoxShape.circle),
+                );
+              },
+            ),
+          // plate label above
+          Positioned(
+            top: 2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x2E000000), blurRadius: 8)]),
+              child: Text(u['name'] ?? 'Vehicle', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink)),
+            ),
+          ),
+          // vehicle pic (rotated by heading)
+          Transform.rotate(
+            angle: widget.heading * 3.14159265 / 180.0,
+            child: SizedBox(width: 46, height: 46, child: vehicleThumb(u['icon_url'], size: 46)),
+          ),
+          // status tag below
+          Positioned(
+            bottom: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+              decoration: BoxDecoration(color: stateColor(s), borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6)]),
+              child: Text(tagText, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ===== Full vehicle detail popup (with engine cut-off) =====
 class _VehicleDetailSheet extends StatefulWidget {
   final Map<String, dynamic> device;
   final bool supportsCutoff;
@@ -281,9 +443,7 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
       _sending = false;
       if (success) _isCut = cut;
     });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(success ? (cut ? 'Engine cut off' : 'Engine resumed') : 'Command failed'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(success ? (cut ? 'Engine cut off' : 'Engine resumed') : 'Command failed')));
   }
 
   @override
@@ -291,10 +451,7 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
     final u = widget.device;
     final s = stateOf(u['online'], u['speed']);
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       padding: EdgeInsets.fromLTRB(20, 10, 20, 20 + MediaQuery.of(context).padding.bottom),
       child: SingleChildScrollView(
         child: Column(
@@ -307,14 +464,9 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
               const SizedBox(width: 13),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(u['name'] ?? 'Vehicle', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                if ((u['model'] ?? '').toString().isNotEmpty)
-                  Text(u['model'], style: const TextStyle(fontSize: 12, color: AppColors.ink2)),
+                if ((u['model'] ?? '').toString().isNotEmpty) Text(u['model'], style: const TextStyle(fontSize: 12, color: AppColors.ink2)),
               ])),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(color: stateBg(s), borderRadius: BorderRadius.circular(20)),
-                child: Text(stateLabels[s]!, style: TextStyle(color: stateColor(s), fontSize: 11, fontWeight: FontWeight.w700)),
-              ),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: stateBg(s), borderRadius: BorderRadius.circular(20)), child: Text(stateLabels[s]!, style: TextStyle(color: stateColor(s), fontSize: 11, fontWeight: FontWeight.w700))),
             ]),
             const SizedBox(height: 16),
             Row(children: [
@@ -335,7 +487,7 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
               )),
               const SizedBox(width: 11),
               Expanded(child: OutlinedButton.icon(
-                onPressed: () => Navigator.pushNamed(context, '/activity'),
+                onPressed: () => Navigator.pushReplacementNamed(context, '/activity'),
                 icon: const Icon(Icons.bar_chart, size: 18),
                 label: const Text('Reports'),
                 style: OutlinedButton.styleFrom(foregroundColor: AppColors.ink, padding: const EdgeInsets.symmetric(vertical: 13)),
@@ -358,11 +510,7 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
                       const Text('Engine Cut-Off', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                       Text(_isCut ? 'Vehicle is immobilized' : 'Immobilizer control', style: const TextStyle(fontSize: 11.5, color: AppColors.ink2)),
                     ])),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-                      decoration: BoxDecoration(color: _isCut ? AppColors.red : AppColors.green, borderRadius: BorderRadius.circular(20)),
-                      child: Text(_isCut ? 'ENGINE CUT' : 'ENGINE ON', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
-                    ),
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5), decoration: BoxDecoration(color: _isCut ? AppColors.red : AppColors.green, borderRadius: BorderRadius.circular(20)), child: Text(_isCut ? 'ENGINE CUT' : 'ENGINE ON', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800))),
                   ]),
                   const SizedBox(height: 13),
                   SizedBox(
