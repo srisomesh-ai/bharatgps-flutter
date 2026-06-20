@@ -13,7 +13,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Map<String, dynamic>> _devices = [];
   bool _loading = true;
   String _filter = '';
-  String _search = '';
 
   @override
   void initState() {
@@ -44,107 +43,142 @@ class _DashboardScreenState extends State<DashboardScreen> {
       else if (s == 'id') idle++;
       else off++;
     }
+    String pct(int n) => total == 0 ? '0%' : '${((n / total) * 100).round()}%';
+
     var list = _devices.where((u) {
-      if (_search.isNotEmpty && !(u['name'] ?? '').toString().toLowerCase().contains(_search)) return false;
       if (_filter.isEmpty) return true;
       return stateOf(u['online'], u['speed']) == _filter;
-    }).toList()
-      ..sort((a, b) => (a['name'] ?? '').toString().toLowerCase().compareTo((b['name'] ?? '').toString().toLowerCase()));
+    }).toList();
 
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // header
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppColors.teal, AppColors.teal2]),
-              ),
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Container(
-                      width: 34, height: 34,
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)),
-                      child: const Icon(Icons.location_on, color: AppColors.teal, size: 22),
-                    ),
+      body: Column(
+        children: [
+          // ===== HEADER =====
+          Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.teal, AppColors.teal2]),
+            ),
+            padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 10, 16, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    // hamburger
+                    Column(mainAxisSize: MainAxisSize.min, children: List.generate(3, (i) => Container(width: 22, height: 2.4, margin: const EdgeInsets.symmetric(vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2))))),
+                    const SizedBox(width: 13),
+                    Container(width: 36, height: 36, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)), padding: const EdgeInsets.all(3), child: Image.asset('assets/logo-icon.png', errorBuilder: (_, __, ___) => const Icon(Icons.location_on, color: AppColors.teal, size: 22))),
                     const SizedBox(width: 9),
                     const Text('Bharat GPS Tracker', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
-                  ]),
-                  const SizedBox(height: 12),
-                  Text('Welcome back', style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13)),
-                  const Text('Your Fleet', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
-                ],
-              ),
+                    const Spacer(),
+                    IconButton(onPressed: () => Navigator.pushReplacementNamed(context, '/alerts'), icon: const Icon(Icons.notifications_none, color: Colors.white, size: 23)),
+                    GestureDetector(
+                      onTap: () => Navigator.pushReplacementNamed(context, '/profile'),
+                      child: Container(width: 38, height: 38, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: const Icon(Icons.person_outline, color: AppColors.teal, size: 22)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Text('Dashboard', style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w800)),
+                const Text('Welcome back 👋', style: TextStyle(color: Colors.white70, fontSize: 14)),
+              ],
             ),
-            // stats
-            Container(
-              color: AppColors.bg,
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+          ),
+          // ===== STATS =====
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+            child: Row(children: [
+              _stat('Total', total, 'All vehicles', AppColors.teal, Icons.local_shipping, ''),
+              const SizedBox(width: 9),
+              _stat('Running', run, pct(run), AppColors.green, Icons.play_arrow, 'rn'),
+              const SizedBox(width: 9),
+              _stat('Idle', idle, pct(idle), AppColors.orange, Icons.pause, 'id'),
+              const SizedBox(width: 9),
+              _stat('Offline', off, pct(off), AppColors.red, Icons.stop, 'of'),
+            ]),
+          ),
+          // ===== My Vehicles + Live =====
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+            child: Row(children: [
+              const Text('My Vehicles', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const Spacer(),
+              Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle)),
+              const SizedBox(width: 6),
+              const Text('Live', style: TextStyle(color: AppColors.green, fontSize: 13, fontWeight: FontWeight.w700)),
+            ]),
+          ),
+          // ===== LIST =====
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: AppColors.teal))
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      itemCount: list.length,
+                      itemBuilder: (_, i) => _vehicleCard(list[i]),
+                    ),
+                  ),
+          ),
+          // ===== Track banner =====
+          GestureDetector(
+            onTap: () => Navigator.pushReplacementNamed(context, '/map'),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.teal, AppColors.teal2]),
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: Row(children: [
-                _stat('Total', total, AppColors.blue, ''),
-                _stat('Running', run, AppColors.green, 'rn'),
-                _stat('Idle', idle, AppColors.orange, 'id'),
-                _stat('Offline', off, AppColors.red, 'of'),
+                const Icon(Icons.map_outlined, color: Colors.white, size: 40),
+                const SizedBox(width: 11),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+                  Text('Track Anytime, Anywhere', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                  Text('Live location of all your vehicles in real-time.', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
+                ])),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(11)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: const [
+                    Text('Track', style: TextStyle(color: AppColors.teal, fontSize: 13, fontWeight: FontWeight.w700)),
+                    SizedBox(width: 5),
+                    Icon(Icons.arrow_forward, color: AppColors.teal, size: 15),
+                  ]),
+                ),
               ]),
             ),
-            // search
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: TextField(
-                onChanged: (v) => setState(() => _search = v.trim().toLowerCase()),
-                decoration: InputDecoration(
-                  hintText: 'Search vehicles…',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-            ),
-            // list
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator(color: AppColors.teal))
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                        itemCount: list.length,
-                        itemBuilder: (_, i) => _vehicleCard(list[i]),
-                      ),
-                    ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
       bottomNavigationBar: const BottomNav(current: 0),
     );
   }
 
-  Widget _stat(String label, int val, Color color, String filterKey) {
+  Widget _stat(String label, int val, String sub, Color color, IconData ic, String filterKey) {
     final active = _filter == filterKey && filterKey.isNotEmpty;
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _filter = (_filter == filterKey) ? '' : filterKey),
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.fromLTRB(4, 12, 4, 11),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: active ? Border.all(color: color, width: 1.5) : null,
-            boxShadow: const [BoxShadow(color: Color(0x110E5C5C), blurRadius: 8)],
+            borderRadius: BorderRadius.circular(15),
+            border: active ? Border.all(color: AppColors.teal, width: 2) : null,
+            boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 8)],
           ),
           child: Column(children: [
-            Text('$val', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+            Container(width: 34, height: 34, decoration: BoxDecoration(color: color, shape: BoxShape.circle), child: Icon(ic, color: Colors.white, size: 17)),
+            const SizedBox(height: 7),
+            Text('$val', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: AppColors.ink, height: 1)),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(fontSize: 10, color: AppColors.ink2, fontWeight: FontWeight.w600, height: 1.2)),
             const SizedBox(height: 2),
-            Text(label, style: const TextStyle(fontSize: 10.5, color: AppColors.ink2, fontWeight: FontWeight.w600)),
+            Text(sub, style: const TextStyle(fontSize: 9.5, color: AppColors.muted, fontWeight: FontWeight.w600)),
           ]),
         ),
       ),
@@ -154,47 +188,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _vehicleCard(Map<String, dynamic> u) {
     final s = stateOf(u['online'], u['speed']);
     final spd = s == 'of' ? '—' : '${u['speed'] ?? 0} km/h';
+    final tint = s == 'rn'
+        ? [const Color(0xFFF2FBF5), Colors.white]
+        : (s == 'id' ? [const Color(0xFFFEF8EE), Colors.white] : [const Color(0xFFFDF1F0), Colors.white]);
+    final addr = (u['address'] ?? '').toString().isNotEmpty ? u['address'].toString() : 'Locating…';
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/map', arguments: u['id']),
+      onTap: () => Navigator.pushReplacementNamed(context, '/map', arguments: u['id']),
       child: Container(
         margin: const EdgeInsets.only(bottom: 11),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [stateBg(s).withOpacity(0.5), Colors.white]),
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: tint),
           borderRadius: BorderRadius.circular(16),
-          boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 10)],
+          boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 12, offset: Offset(0, 3))],
         ),
         child: Column(
           children: [
             Row(children: [
               Container(
                 width: 50, height: 50,
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                child: Center(child: vehicleThumb(u['icon_url'])),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Color(0x140E5C5C), blurRadius: 5)]),
+                child: Center(child: vehicleThumb(u['icon_url'], size: 42)),
               ),
               const SizedBox(width: 11),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(u['name'] ?? 'Vehicle',
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                  if ((u['model'] ?? '').toString().isNotEmpty)
-                    Text(u['model'], maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11.5, color: AppColors.ink2)),
-                ]),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(u['name'] ?? 'Vehicle', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                if ((u['model'] ?? '').toString().isNotEmpty)
+                  Padding(padding: const EdgeInsets.only(top: 2), child: Text(u['model'], maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: AppColors.ink2))),
+              ])),
+              Container(
+                width: 11, height: 11,
+                decoration: BoxDecoration(color: stateColor(s), shape: BoxShape.circle, boxShadow: [BoxShadow(color: stateBg(s), blurRadius: 0, spreadRadius: 4)]),
               ),
-              Container(width: 11, height: 11, decoration: BoxDecoration(color: stateColor(s), shape: BoxShape.circle)),
             ]),
-            const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1)),
-            Row(children: [
-              const Icon(Icons.speed, size: 13, color: AppColors.teal),
-              const SizedBox(width: 5),
-              Text(spd, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ink2)),
-              const Spacer(),
-              const Icon(Icons.schedule, size: 13, color: AppColors.teal),
-              const SizedBox(width: 5),
-              Text(agoText(u['time']), style: const TextStyle(fontSize: 11, color: AppColors.ink2)),
-            ]),
+            Container(margin: const EdgeInsets.only(top: 11), padding: const EdgeInsets.only(top: 10), decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x0D000000)))),
+              child: Row(children: [
+                const Icon(Icons.schedule, size: 13, color: AppColors.teal),
+                const SizedBox(width: 5),
+                Text(spd, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.ink)),
+                const Spacer(),
+                const Icon(Icons.place, size: 13, color: AppColors.teal),
+                const SizedBox(width: 4),
+                Flexible(child: Text(addr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ink2))),
+                const Spacer(),
+                const Icon(Icons.access_time, size: 13, color: AppColors.teal),
+                const SizedBox(width: 4),
+                Text(agoText(u['time']), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ink2)),
+              ]),
+            ),
           ],
         ),
       ),
