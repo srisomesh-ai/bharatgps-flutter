@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
+import 'troubleshoot_sheet.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -90,6 +91,15 @@ class _MapScreenState extends State<MapScreen> {
         device: u,
         supportsCutoff: _gprsDevices.contains('${u['id']}'),
       ),
+    );
+  }
+
+  void _openTroubleshoot(Map<String, dynamic> u) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => TroubleshootSheet(device: u),
     );
   }
 
@@ -257,15 +267,28 @@ class _MapScreenState extends State<MapScreen> {
               ]),
             ])),
             const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: () => _openDetail(u),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11))),
-              child: Row(mainAxisSize: MainAxisSize.min, children: const [
-                Text('View Details', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                SizedBox(width: 6),
-                Icon(Icons.arrow_forward, size: 15),
-              ]),
-            ),
+            Column(mainAxisSize: MainAxisSize.min, children: [
+              ElevatedButton(
+                onPressed: () => _openDetail(u),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)), minimumSize: const Size(0, 0)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: const [
+                  Text('View Details', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                  SizedBox(width: 6),
+                  Icon(Icons.arrow_forward, size: 15),
+                ]),
+              ),
+              if (s == 'of') ...[
+                const SizedBox(height: 6),
+                GestureDetector(
+                  onTap: () => _openTroubleshoot(u),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: const [
+                    Icon(Icons.error_outline, size: 13, color: AppColors.red),
+                    SizedBox(width: 4),
+                    Text('Troubleshoot', style: TextStyle(fontSize: 11.5, color: AppColors.red, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+              ],
+            ]),
           ]),
           Container(
             margin: const EdgeInsets.only(top: 11),
@@ -450,8 +473,11 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
   Widget build(BuildContext context) {
     final u = widget.device;
     final s = stateOf(u['online'], u['speed']);
+    final addr = (u['address'] ?? '').toString().isNotEmpty ? u['address'].toString() : '${u['lat']}, ${u['lng']}';
+    final gps = s == 'of' ? 'Lost' : 'Strong';
     return Container(
       decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
       padding: EdgeInsets.fromLTRB(20, 10, 20, 20 + MediaQuery.of(context).padding.bottom),
       child: SingleChildScrollView(
         child: Column(
@@ -459,40 +485,79 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(child: Container(width: 38, height: 5, margin: const EdgeInsets.only(bottom: 14), decoration: BoxDecoration(color: const Color(0xFFE2E9E8), borderRadius: BorderRadius.circular(3)))),
+            // head with close
             Row(children: [
               Container(width: 60, height: 60, decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(16)), child: Center(child: vehicleThumb(u['icon_url'], size: 48))),
               const SizedBox(width: 13),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(u['name'] ?? 'Vehicle', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                if ((u['model'] ?? '').toString().isNotEmpty) Text(u['model'], style: const TextStyle(fontSize: 12, color: AppColors.ink2)),
+                Row(children: [
+                  Flexible(child: Text(u['name'] ?? 'Vehicle', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+                  const SizedBox(width: 8),
+                  Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3), decoration: BoxDecoration(color: stateBg(s), borderRadius: BorderRadius.circular(20)), child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Container(width: 6, height: 6, decoration: BoxDecoration(color: stateColor(s), shape: BoxShape.circle)),
+                    const SizedBox(width: 5),
+                    Text(stateLabels[s]!, style: TextStyle(color: stateColor(s), fontSize: 10, fontWeight: FontWeight.w700)),
+                  ])),
+                ]),
+                if ((u['model'] ?? '').toString().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 3), child: Text(u['model'], style: const TextStyle(fontSize: 12, color: AppColors.ink2))),
               ])),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: stateBg(s), borderRadius: BorderRadius.circular(20)), child: Text(stateLabels[s]!, style: TextStyle(color: stateColor(s), fontSize: 11, fontWeight: FontWeight.w700))),
+              GestureDetector(onTap: () => Navigator.pop(context), child: Container(width: 32, height: 32, decoration: const BoxDecoration(color: AppColors.bg, shape: BoxShape.circle), child: const Icon(Icons.close, size: 16, color: AppColors.ink2))),
             ]),
             const SizedBox(height: 16),
+            // 2 tiles
             Row(children: [
               _tile('${s == 'of' ? '—' : (u['speed'] ?? 0)}', 'km/h'),
               const SizedBox(width: 9),
-              _tile(s == 'rn' ? 'ON' : (s == 'id' ? 'IDLE' : 'OFF'), 'Engine'),
+              _tile(s == 'rn' ? 'ON' : (s == 'id' ? 'IDLE' : 'OFF'), 'Engine', color: s == 'rn' ? AppColors.green : (s == 'of' ? AppColors.red : AppColors.orange)),
             ]),
             const SizedBox(height: 14),
+            // address bar
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(14)),
+              child: Row(children: [
+                const Icon(Icons.place, size: 20, color: AppColors.teal),
+                const SizedBox(width: 9),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(addr, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  Padding(padding: const EdgeInsets.only(top: 2), child: Text('Updated ${agoText(u['time'])}', style: const TextStyle(fontSize: 11, color: AppColors.muted))),
+                ])),
+              ]),
+            ),
+            const SizedBox(height: 14),
+            // vehicle details rows
+            const Text('Vehicle Details', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink2)),
+            const SizedBox(height: 6),
             _row(Icons.schedule, 'Last Update', agoText(u['time'])),
-            _row(Icons.my_location, 'Location', (u['address'] ?? '').toString().isNotEmpty ? u['address'] : '${u['lat']}, ${u['lng']}'),
+            const Divider(height: 1, color: AppColors.line),
+            _row(Icons.wifi, 'GPS Signal', gps, valColor: gps == 'Strong' ? AppColors.green : AppColors.red),
             const SizedBox(height: 16),
+            // actions: Live Track + Playback, then Reports full-width
             Row(children: [
               Expanded(child: ElevatedButton.icon(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.location_on, size: 18),
                 label: const Text('Live Track'),
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 13)),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
               )),
-              const SizedBox(width: 11),
+              const SizedBox(width: 10),
               Expanded(child: OutlinedButton.icon(
                 onPressed: () => Navigator.pushReplacementNamed(context, '/activity'),
-                icon: const Icon(Icons.bar_chart, size: 18),
-                label: const Text('Reports'),
-                style: OutlinedButton.styleFrom(foregroundColor: AppColors.ink, padding: const EdgeInsets.symmetric(vertical: 13)),
+                icon: const Icon(Icons.play_circle_outline, size: 18),
+                label: const Text('Playback'),
+                style: OutlinedButton.styleFrom(foregroundColor: AppColors.ink2, side: const BorderSide(color: AppColors.line), padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
               )),
             ]),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.pushReplacementNamed(context, '/activity'),
+                icon: const Icon(Icons.bar_chart, size: 18),
+                label: const Text('Reports & History'),
+                style: OutlinedButton.styleFrom(foregroundColor: AppColors.ink2, side: const BorderSide(color: AppColors.line), padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
+              ),
+            ),
             if (widget.supportsCutoff) ...[
               const SizedBox(height: 14),
               Container(
@@ -532,25 +597,26 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
     );
   }
 
-  Widget _tile(String v, String l) => Expanded(
+  Widget _tile(String v, String l, {Color? color}) => Expanded(
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 11),
           decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(14)),
           child: Column(children: [
-            Text(v, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            Container(width: 30, height: 30, margin: const EdgeInsets.only(bottom: 6), decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: Icon(l == 'km/h' ? Icons.speed : Icons.power_settings_new, size: 16, color: AppColors.teal)),
+            Text(v, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color ?? AppColors.ink)),
             Text(l, style: const TextStyle(fontSize: 9.5, color: AppColors.muted, fontWeight: FontWeight.w600)),
           ]),
         ),
       );
 
-  Widget _row(IconData ic, String k, String v) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+  Widget _row(IconData ic, String k, String v, {Color? valColor}) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 11),
         child: Row(children: [
           Icon(ic, size: 16, color: AppColors.teal),
           const SizedBox(width: 8),
           Text(k, style: const TextStyle(fontSize: 13, color: AppColors.ink2)),
           const Spacer(),
-          Flexible(child: Text(v, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+          Flexible(child: Text(v, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.right, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: valColor ?? AppColors.ink))),
         ]),
       );
 }
