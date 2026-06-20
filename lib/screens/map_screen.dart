@@ -17,6 +17,8 @@ class _MapScreenState extends State<MapScreen> {
   bool _loading = true;
   List<String> _gprsDevices = [];
   dynamic _focusId;
+  String _search = '';
+  bool _satellite = false;
 
   @override
   void initState() {
@@ -94,50 +96,141 @@ class _MapScreenState extends State<MapScreen> {
     final center = _devices.isNotEmpty && _devices.first['lat'] != null
         ? LatLng(_toD(_devices.first['lat']), _toD(_devices.first['lng']))
         : const LatLng(20.59, 78.96);
+    final visible = _devices.where((u) {
+      if (_search.isEmpty) return true;
+      return (u['name'] ?? '').toString().toLowerCase().contains(_search);
+    }).toList();
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppColors.teal, AppColors.teal2]),
-              ),
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-              child: Row(children: [
-                Container(
-                  width: 34, height: 34,
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)),
-                  child: const Icon(Icons.location_on, color: AppColors.teal, size: 22),
-                ),
+      body: Column(
+        children: [
+          // ===== HEADER =====
+          Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.teal, AppColors.teal2]),
+            ),
+            padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 10, 16, 14),
+            child: Column(children: [
+              Row(children: [
+                Column(mainAxisSize: MainAxisSize.min, children: List.generate(3, (i) => Container(width: 22, height: 2.4, margin: const EdgeInsets.symmetric(vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2))))),
+                const SizedBox(width: 13),
+                Container(width: 36, height: 36, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)), padding: const EdgeInsets.all(3), child: Image.asset('assets/logo-icon.png', errorBuilder: (_, __, ___) => const Icon(Icons.location_on, color: AppColors.teal, size: 22))),
                 const SizedBox(width: 9),
-                const Text('Live Map', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
+                const Text('Bharat GPS Tracker', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
                 const Spacer(),
-                IconButton(onPressed: _load, icon: const Icon(Icons.refresh, color: Colors.white)),
+                IconButton(onPressed: () => Navigator.pushReplacementNamed(context, '/alerts'), icon: const Icon(Icons.notifications_none, color: Colors.white, size: 23), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                const SizedBox(width: 14),
+                const Icon(Icons.filter_list, color: Colors.white, size: 23),
               ]),
-            ),
-            Expanded(
-              child: Stack(children: [
-                FlutterMap(
-                  mapController: _map,
-                  options: MapOptions(initialCenter: center, initialZoom: _devices.isEmpty ? 5 : 12),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                      subdomains: const ['a', 'b', 'c', 'd'],
-                      userAgentPackageName: 'com.bharatgps.app',
-                    ),
-                    MarkerLayer(markers: _markers()),
-                  ],
+              const SizedBox(height: 12),
+              // search bar
+              Container(
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+                child: TextField(
+                  onChanged: (v) => setState(() => _search = v.trim().toLowerCase()),
+                  decoration: const InputDecoration(
+                    hintText: 'Search Vehicles / Places',
+                    hintStyle: TextStyle(color: AppColors.muted, fontSize: 14),
+                    prefixIcon: Icon(Icons.search, color: AppColors.muted, size: 21),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 14),
+                  ),
                 ),
-                if (_loading) const Center(child: CircularProgressIndicator(color: AppColors.teal)),
-              ]),
-            ),
-          ],
-        ),
+              ),
+            ]),
+          ),
+          // ===== count + Map/Satellite =====
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 6)]),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.people_alt_outlined, size: 17, color: AppColors.teal),
+                  const SizedBox(width: 7),
+                  Text('${visible.length} Vehicles', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  const Icon(Icons.keyboard_arrow_down, size: 18, color: AppColors.ink2),
+                ]),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 6)]),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  _segBtn('Map', !_satellite, () => setState(() => _satellite = false)),
+                  _segBtn('Satellite', _satellite, () => setState(() => _satellite = true)),
+                ]),
+              ),
+            ]),
+          ),
+          // ===== MAP =====
+          Expanded(
+            child: Stack(children: [
+              FlutterMap(
+                mapController: _map,
+                options: MapOptions(initialCenter: center, initialZoom: _devices.isEmpty ? 5 : 12),
+                children: [
+                  TileLayer(
+                    urlTemplate: _satellite
+                        ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+                        : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+                    subdomains: const ['a', 'b', 'c', 'd'],
+                    userAgentPackageName: 'com.bharatgps.app',
+                  ),
+                  MarkerLayer(markers: _markers()),
+                ],
+              ),
+              if (_loading) const Center(child: CircularProgressIndicator(color: AppColors.teal)),
+              // floating controls
+              Positioned(
+                right: 14, top: 16,
+                child: Column(children: [
+                  _mapCtrl(Icons.my_location, () {
+                    if (_devices.isNotEmpty && _devices.first['lat'] != null) {
+                      _map.move(LatLng(_toD(_devices.first['lat']), _toD(_devices.first['lng'])), 14);
+                    }
+                  }),
+                  const SizedBox(height: 12),
+                  _mapCtrl(Icons.layers_outlined, () => setState(() => _satellite = !_satellite)),
+                  const SizedBox(height: 12),
+                  Container(
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: Color(0x1F0E5C5C), blurRadius: 8)]),
+                    child: Column(children: [
+                      IconButton(onPressed: () => _map.move(_map.camera.center, _map.camera.zoom + 1), icon: const Icon(Icons.add, color: AppColors.ink)),
+                      Container(width: 24, height: 1, color: AppColors.line),
+                      IconButton(onPressed: () => _map.move(_map.camera.center, _map.camera.zoom - 1), icon: const Icon(Icons.remove, color: AppColors.ink)),
+                    ]),
+                  ),
+                ]),
+              ),
+            ]),
+          ),
+        ],
       ),
       bottomNavigationBar: const BottomNav(current: 2),
+    );
+  }
+
+  Widget _segBtn(String label, bool active, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(color: active ? AppColors.teal : Colors.transparent, borderRadius: BorderRadius.circular(16)),
+        child: Text(label, style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w700, fontSize: 13)),
+      ),
+    );
+  }
+
+  Widget _mapCtrl(IconData ic, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 46, height: 46,
+        decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: const [BoxShadow(color: Color(0x1F0E5C5C), blurRadius: 8)]),
+        child: Icon(ic, color: AppColors.teal, size: 22),
+      ),
     );
   }
 }
