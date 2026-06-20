@@ -87,6 +87,12 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
             ),
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)), padding: const EdgeInsets.all(3), child: Image.asset('assets/logo-icon.png', errorBuilder: (_, __, ___) => const Icon(Icons.location_on, color: AppColors.teal, size: 20))),
+                const SizedBox(width: 9),
+                const Text('Bharat GPS Tracker', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+              ]),
+              const SizedBox(height: 10),
               const Text('Alerts', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800)),
               const SizedBox(height: 10),
               TabBar(
