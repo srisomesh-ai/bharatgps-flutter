@@ -46,143 +46,157 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.of(context).size.width;
+    final logoW = (screenW * 0.78).clamp(220.0, 340.0);
     return Scaffold(
       backgroundColor: const Color(0xFFF3F6F5),
       body: Stack(
         children: [
           Positioned.fill(child: CustomPaint(painter: _GridPainter())),
           SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // brand header
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 36, 24, 8),
-                    child: Column(
-                      children: [
-                        Image.asset('assets/logo.png',
-                            width: 320, fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => _logoFallback()),
-                        const SizedBox(height: 8),
-                        const Text('हर रास्ते पर, हमारी नज़र',
-                            style: TextStyle(fontSize: 14, color: Color(0xFF5A6A6A), fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  ),
-                  // card
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(16, 22, 16, 0),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                      boxShadow: [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 24, offset: Offset(0, -2))],
-                    ),
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(22, 26, 22, 0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const Center(child: Text('Welcome Back!', style: TextStyle(color: AppColors.teal, fontSize: 23, fontWeight: FontWeight.w700))),
-                              const SizedBox(height: 4),
-                              const Center(child: Text('Login to your account', style: TextStyle(color: AppColors.muted, fontSize: 14))),
-                              const SizedBox(height: 24),
-                              if (_error != null) _banner(_error!),
-                              _inputField(controller: _email, hint: 'Email Address', icon: Icons.mail_outline, keyboard: TextInputType.emailAddress),
-                              const SizedBox(height: 16),
-                              _inputField(
-                                controller: _pass,
-                                hint: 'Password',
-                                icon: Icons.lock_outline,
-                                obscure: _obscure,
-                                trailing: GestureDetector(
-                                  onTap: () => setState(() => _obscure = !_obscure),
-                                  child: Icon(_obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 22, color: AppColors.muted),
-                                ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: IntrinsicHeight(
+                      child: Column(
+                        children: [
+                          // brand header
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 30, 24, 6),
+                            child: Column(
+                              children: [
+                                Image.asset('assets/logo.png',
+                                    width: logoW, fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => _logoFallback()),
+                                const SizedBox(height: 6),
+                                const Text('हर रास्ते पर, हमारी नज़र',
+                                    style: TextStyle(fontSize: 14, color: Color(0xFF5A6A6A), fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                          ),
+                          // card — fills remaining height like web flex:1
+                          Expanded(
+                            child: Container(
+                              margin: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                                boxShadow: [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 24, offset: Offset(0, -2))],
                               ),
-                              const SizedBox(height: 4),
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(2, 6, 2, 20),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () => setState(() => _remember = !_remember),
-                                      child: Row(children: [
-                                        Container(
-                                          width: 22, height: 22,
-                                          decoration: BoxDecoration(
-                                            color: _remember ? AppColors.teal : Colors.white,
-                                            borderRadius: BorderRadius.circular(7),
-                                            border: Border.all(color: _remember ? AppColors.teal : const Color(0xFFC2CFCF), width: 2),
-                                          ),
-                                          child: _remember ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
-                                        ),
-                                        const SizedBox(width: 9),
-                                        const Text('Remember Me', style: TextStyle(fontSize: 13.5, color: Color(0xFF3A4A4A), fontWeight: FontWeight.w500)),
-                                      ]),
-                                    ),
-                                    GestureDetector(
-                                      onTap: _forgotPassword,
-                                      child: const Text('Forgot Password?', style: TextStyle(fontSize: 13.5, color: AppColors.teal, fontWeight: FontWeight.w600, decoration: TextDecoration.underline)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              _loginButton(),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 2),
-                                child: Row(children: const [
-                                  Expanded(child: Divider(color: Color(0xFFE3EAE8), thickness: 1)),
-                                  Padding(padding: EdgeInsets.symmetric(horizontal: 14), child: Text('or', style: TextStyle(color: AppColors.muted, fontSize: 13))),
-                                  Expanded(child: Divider(color: Color(0xFFE3EAE8), thickness: 1)),
-                                ]),
-                              ),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  onPressed: _otpLogin,
-                                  icon: const Icon(Icons.verified_user_outlined, size: 21),
-                                  label: const Text('Login with OTP', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppColors.teal,
-                                    side: const BorderSide(color: AppColors.teal, width: 1.5),
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(0, 18, 0, 10),
-                                child: Center(
-                                  child: RichText(
-                                    text: const TextSpan(
-                                      style: TextStyle(fontSize: 14, color: Color(0xFF3A4A4A), fontWeight: FontWeight.w500),
+                              child: Column(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(22, 24, 22, 0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
                                       children: [
-                                        TextSpan(text: "Don't have an account? "),
-                                        TextSpan(text: 'Sign Up', style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.w700)),
+                                        const Center(child: Text('Welcome Back!', style: TextStyle(color: AppColors.teal, fontSize: 23, fontWeight: FontWeight.w700))),
+                                        const SizedBox(height: 4),
+                                        const Center(child: Text('Login to your account', style: TextStyle(color: AppColors.muted, fontSize: 14))),
+                                        const SizedBox(height: 22),
+                                        if (_error != null) _banner(_error!),
+                                        _inputField(controller: _email, hint: 'Email Address', icon: Icons.mail_outline, keyboard: TextInputType.emailAddress),
+                                        const SizedBox(height: 16),
+                                        _inputField(
+                                          controller: _pass,
+                                          hint: 'Password',
+                                          icon: Icons.lock_outline,
+                                          obscure: _obscure,
+                                          trailing: GestureDetector(
+                                            onTap: () => setState(() => _obscure = !_obscure),
+                                            child: Icon(_obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 22, color: AppColors.muted),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(2, 6, 2, 18),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              GestureDetector(
+                                                onTap: () => setState(() => _remember = !_remember),
+                                                child: Row(children: [
+                                                  Container(
+                                                    width: 22, height: 22,
+                                                    decoration: BoxDecoration(
+                                                      color: _remember ? AppColors.teal : Colors.white,
+                                                      borderRadius: BorderRadius.circular(7),
+                                                      border: Border.all(color: _remember ? AppColors.teal : const Color(0xFFC2CFCF), width: 2),
+                                                    ),
+                                                    child: _remember ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
+                                                  ),
+                                                  const SizedBox(width: 9),
+                                                  const Text('Remember Me', style: TextStyle(fontSize: 13.5, color: Color(0xFF3A4A4A), fontWeight: FontWeight.w500)),
+                                                ]),
+                                              ),
+                                              GestureDetector(
+                                                onTap: _forgotPassword,
+                                                child: const Text('Forgot Password?', style: TextStyle(fontSize: 13.5, color: AppColors.teal, fontWeight: FontWeight.w600, decoration: TextDecoration.underline)),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        _loginButton(),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 2),
+                                          child: Row(children: const [
+                                            Expanded(child: Divider(color: Color(0xFFE3EAE8), thickness: 1)),
+                                            Padding(padding: EdgeInsets.symmetric(horizontal: 14), child: Text('or', style: TextStyle(color: AppColors.muted, fontSize: 13))),
+                                            Expanded(child: Divider(color: Color(0xFFE3EAE8), thickness: 1)),
+                                          ]),
+                                        ),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: OutlinedButton.icon(
+                                            onPressed: _otpLogin,
+                                            icon: const Icon(Icons.verified_user_outlined, size: 21),
+                                            label: const Text('Login with OTP', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: AppColors.teal,
+                                              side: const BorderSide(color: AppColors.teal, width: 1.5),
+                                              padding: const EdgeInsets.symmetric(vertical: 16),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                            ),
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
+                                          child: Center(
+                                            child: RichText(
+                                              text: const TextSpan(
+                                                style: TextStyle(fontSize: 14, color: Color(0xFF3A4A4A), fontWeight: FontWeight.w500),
+                                                children: [
+                                                  TextSpan(text: "Don't have an account? "),
+                                                  TextSpan(text: 'Sign Up', style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.w700)),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
-                                ),
+                                  const Spacer(),
+                                  // skyline footer pinned to bottom of card
+                                  SizedBox(height: 80, width: double.infinity, child: CustomPaint(painter: _SkylinePainter())),
+                                  Container(
+                                    width: double.infinity,
+                                    color: AppColors.teal,
+                                    padding: const EdgeInsets.only(top: 6, bottom: 12),
+                                    child: const Text('Version 1.0.0', textAlign: TextAlign.center, style: TextStyle(color: Color(0xEBFFFFFF), fontSize: 12, fontWeight: FontWeight.w500, letterSpacing: 0.3)),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(height: 90, width: double.infinity, child: CustomPaint(painter: _SkylinePainter())),
-                        Container(
-                          width: double.infinity,
-                          color: AppColors.teal,
-                          padding: const EdgeInsets.only(top: 6, bottom: 14),
-                          child: const Text('Version 1.0.0', textAlign: TextAlign.center, style: TextStyle(color: Color(0xEBFFFFFF), fontSize: 12, fontWeight: FontWeight.w500, letterSpacing: 0.3)),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ),
         ],
