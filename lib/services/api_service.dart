@@ -257,6 +257,78 @@ class ApiService {
   static double _rad(num d) => d * pi / 180.0;
 
   /// Today's stats from real history (matches history report).
+  /// Auto-detect trips from GPS history (no manual start/stop).
+  /// A trip = continuous movement; it ends after the vehicle is stopped for
+  /// [stopMinutes]. Works even if the app was closed, because the server logs all points.
+  static Future<List<Map<String, dynamic>>> getTrips({
+    required String deviceId,
+    int days = 1,
+    int stopMinutes = 5,
+    int moveSpeed = 3, // km/h above which the vehicle is "moving"
+  }) async {
+    final hist = await getHistory(deviceId: deviceId, days: days);
+    final pts = (hist['points'] as List?) ?? [];
+    final trips = <Map<String, dynamic>>[];
+    if (pts.isEmpty) return trips;
+
+    List<Map<String, dynamic>> cur = [];
+    DateTime? lastMove;
+    DateTime? pt(dynamic t) => DateTime.tryParse('$t'.replaceFirst(' ', 'T'));
+
+    void closeTrip() {
+      if (cur.length < 2) {
+        cur = [];
+        return;
+      }
+      double dist = 0;
+      int maxSpd = 0;
+      for (int i = 1; i < cur.length; i++) {
+        dist += _haversine(cur[i - 1], cur[i]);
+        final s = (cur[i]['spd'] as num).toInt();
+        if (s > maxSpd) maxSpd = s;
+      }
+      final t0 = pt(cur.first['t']);
+      final t1 = pt(cur.last['t']);
+      if (t0 == null || t1 == null || dist < 0.3) {
+        cur = [];
+        return;
+      }
+      trips.add({
+        'start': cur.first['t'],
+        'end': cur.last['t'],
+        'startLat': cur.first['lat'],
+        'startLng': cur.first['lng'],
+        'endLat': cur.last['lat'],
+        'endLng': cur.last['lng'],
+        'distance': double.parse(dist.toStringAsFixed(1)),
+        'duration_min': t1.difference(t0).inMinutes,
+        'max_speed': maxSpd,
+        'points': List<Map<String, dynamic>>.from(cur),
+      });
+      cur = [];
+    }
+
+    for (final p in pts) {
+      final spd = (p['spd'] as num?)?.toInt() ?? 0;
+      final t = pt(p['t']);
+      if (spd >= moveSpeed) {
+        cur.add(Map<String, dynamic>.from(p));
+        lastMove = t;
+      } else {
+        if (cur.isNotEmpty && lastMove != null && t != null) {
+          if (t.difference(lastMove).inMinutes >= stopMinutes) {
+            closeTrip();
+          } else {
+            cur.add(Map<String, dynamic>.from(p));
+          }
+        }
+      }
+    }
+    closeTrip();
+    trips.sort((a, b) => '${b['start']}'.compareTo('${a['start']}'));
+    return trips;
+  }
+
   static Future<Map<String, dynamic>> getDayStats(String deviceId) async {
     final h = await getHistory(deviceId: deviceId, days: 1);
     final pts = h['points'] as List;
