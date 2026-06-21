@@ -42,6 +42,11 @@ jobs:
           cp -r /tmp/keep/raw/* android/app/src/main/res/raw/ 2>/dev/null || true
           cp /tmp/keep/google-services.json android/app/google-services.json 2>/dev/null || true
 
+      - name: Show generated android gradle files (debug)
+        run: |
+          echo "---- android/app ----"; ls -la android/app | grep -i gradle || true
+          echo "---- android ----"; ls -la android | grep -i gradle || true
+
       - name: Patch manifest (name, internet, cleartext, notif permission)
         run: |
           python3 - <<'PY'
@@ -59,37 +64,56 @@ jobs:
           print('manifest patched')
           PY
 
-      - name: Enable core library desugaring (required by flutter_local_notifications)
+      - name: Enable desugaring + minSdk (handles .gradle and .gradle.kts)
         run: |
           python3 - <<'PY'
-          import re
-          p='android/app/build.gradle'
+          import os, re
+
+          groovy='android/app/build.gradle'
+          kts='android/app/build.gradle.kts'
+
+          if os.path.exists(groovy):
+              p=groovy; kotlin=False
+          elif os.path.exists(kts):
+              p=kts; kotlin=True
+          else:
+              raise SystemExit('No app build.gradle(.kts) found')
+
           s=open(p).read()
+          print('Patching', p, '(kts)' if kotlin else '(groovy)')
 
-          # 1) enable desugaring flag inside compileOptions
-          if 'coreLibraryDesugaringEnabled' not in s:
-              if re.search(r'compileOptions\s*\{', s):
-                  s=re.sub(r'(compileOptions\s*\{)', r'\1\n        coreLibraryDesugaringEnabled true', s, count=1)
-              else:
-                  # add a compileOptions block inside android { }
-                  s=re.sub(r'(android\s*\{)', r'\1\n    compileOptions {\n        coreLibraryDesugaringEnabled true\n        sourceCompatibility JavaVersion.VERSION_1_8\n        targetCompatibility JavaVersion.VERSION_1_8\n    }', s, count=1)
-
-          # 2) add the desugaring dependency
-          if 'desugar_jdk_libs' not in s:
-              if re.search(r'dependencies\s*\{', s):
-                  s=re.sub(r'(dependencies\s*\{)', r'\1\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"', s, count=1)
-              else:
-                  s=s.rstrip()+'\n\ndependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"\n}\n'
-
-          # 3) ensure minSdk >= 21 (desugaring + firebase need it)
-          s=re.sub(r'minSdk(Version)?\s+\d+', 'minSdk 21', s)
-          s=re.sub(r'minSdk(Version)?\s*=\s*\d+', 'minSdk = 21', s)
-          # handle flutter.minSdkVersion placeholder
-          s=s.replace('minSdk flutter.minSdkVersion', 'minSdk 21')
-          s=s.replace('minSdkVersion flutter.minSdkVersion', 'minSdk 21')
+          if kotlin:
+              # compileOptions { isCoreLibraryDesugaringEnabled = true }
+              if 'isCoreLibraryDesugaringEnabled' not in s:
+                  if re.search(r'compileOptions\s*\{', s):
+                      s=re.sub(r'(compileOptions\s*\{)', r'\1\n        isCoreLibraryDesugaringEnabled = true', s, count=1)
+                  else:
+                      s=re.sub(r'(android\s*\{)', r'\1\n    compileOptions {\n        isCoreLibraryDesugaringEnabled = true\n    }', s, count=1)
+              # dependencies { coreLibraryDesugaring("...") }
+              if 'desugar_jdk_libs' not in s:
+                  if re.search(r'dependencies\s*\{', s):
+                      s=re.sub(r'(dependencies\s*\{)', r'\1\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")', s, count=1)
+                  else:
+                      s=s.rstrip()+'\n\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")\n}\n'
+              # minSdk = 21
+              s=re.sub(r'minSdk\s*=\s*flutter\.minSdkVersion', 'minSdk = 21', s)
+              s=re.sub(r'minSdk\s*=\s*\d+', 'minSdk = 21', s)
+          else:
+              if 'coreLibraryDesugaringEnabled' not in s:
+                  if re.search(r'compileOptions\s*\{', s):
+                      s=re.sub(r'(compileOptions\s*\{)', r'\1\n        coreLibraryDesugaringEnabled true', s, count=1)
+                  else:
+                      s=re.sub(r'(android\s*\{)', r'\1\n    compileOptions {\n        coreLibraryDesugaringEnabled true\n        sourceCompatibility JavaVersion.VERSION_1_8\n        targetCompatibility JavaVersion.VERSION_1_8\n    }', s, count=1)
+              if 'desugar_jdk_libs' not in s:
+                  if re.search(r'dependencies\s*\{', s):
+                      s=re.sub(r'(dependencies\s*\{)', r'\1\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"', s, count=1)
+                  else:
+                      s=s.rstrip()+'\n\ndependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"\n}\n'
+              s=re.sub(r'minSdk(Version)?\s+flutter\.minSdkVersion', 'minSdk 21', s)
+              s=re.sub(r'minSdk(Version)?\s+\d+', 'minSdk 21', s)
 
           open(p,'w').write(s)
-          print('desugaring enabled')
+          print('desugaring + minSdk patched')
           PY
 
       - name: Enable Firebase (google-services) only if config present
@@ -97,17 +121,29 @@ jobs:
           if [ -f android/app/google-services.json ]; then
             echo "google-services.json found — enabling Firebase plugin"
             python3 - <<'PY'
-          import re
-          p='android/app/build.gradle'
+          import os, re
+          # app build file
+          groovy='android/app/build.gradle'; kts='android/app/build.gradle.kts'
+          if os.path.exists(groovy): p=groovy; kotlin=False
+          else: p=kts; kotlin=True
           s=open(p).read()
           if 'com.google.gms.google-services' not in s:
-              s=re.sub(r'(plugins\s*\{)', r'\1\n    id "com.google.gms.google-services"', s, count=1)
+              if kotlin:
+                  s=re.sub(r'(plugins\s*\{)', r'\1\n    id("com.google.gms.google-services")', s, count=1)
+              else:
+                  s=re.sub(r'(plugins\s*\{)', r'\1\n    id "com.google.gms.google-services"', s, count=1)
           open(p,'w').write(s)
-          p2='android/settings.gradle'
-          s2=open(p2).read()
+          # settings file
+          sg='android/settings.gradle'; sk='android/settings.gradle.kts'
+          if os.path.exists(sg): sp=sg; skotlin=False
+          else: sp=sk; skotlin=True
+          s2=open(sp).read()
           if 'com.google.gms.google-services' not in s2:
-              s2=re.sub(r'(plugins\s*\{)', r'\1\n    id "com.google.gms.google-services" version "4.4.1" apply false', s2, count=1)
-          open(p2,'w').write(s2)
+              if skotlin:
+                  s2=re.sub(r'(plugins\s*\{)', r'\1\n    id("com.google.gms.google-services") version "4.4.1" apply false', s2, count=1)
+              else:
+                  s2=re.sub(r'(plugins\s*\{)', r'\1\n    id "com.google.gms.google-services" version "4.4.1" apply false', s2, count=1)
+          open(sp,'w').write(s2)
           print('Firebase plugin enabled')
           PY
           else
