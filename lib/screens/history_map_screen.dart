@@ -9,7 +9,9 @@ import '../services/api_service.dart';
 class HistoryMapScreen extends StatefulWidget {
   final Map<String, dynamic> device;
   final int days;
-  const HistoryMapScreen({super.key, required this.device, required this.days});
+  final DateTime? from;
+  final DateTime? to;
+  const HistoryMapScreen({super.key, required this.device, this.days = 1, this.from, this.to});
   @override
   State<HistoryMapScreen> createState() => _HistoryMapScreenState();
 }
@@ -39,7 +41,9 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
   }
 
   Future<void> _load() async {
-    final h = await ApiService.getHistory(deviceId: '${widget.device['id']}', days: widget.days);
+    final h = (widget.from != null && widget.to != null)
+        ? await ApiService.getHistory(deviceId: '${widget.device['id']}', from: widget.from, to: widget.to)
+        : await ApiService.getHistory(deviceId: '${widget.device['id']}', days: widget.days);
     if (!mounted) return;
     setState(() {
       _points = List<Map<String, dynamic>>.from(h['points']);
