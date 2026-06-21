@@ -407,30 +407,62 @@ class ApiService {
     String dd(DateTime t) => '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
     final dateFrom = '${dd(fromDay)} 00:00:00';
     final dateTo = '${dd(now)} 23:59:59';
-    final res = await http.get(_u(host!, 'get_events', {
-      'lang': 'en',
-      'user_api_hash': hash!,
-      'date_from': dateFrom,
-      'date_to': dateTo,
-    })).timeout(const Duration(seconds: 25));
     final out = <Map<String, dynamic>>[];
-    if (res.statusCode == 200) {
+    try {
+      final res = await http.get(_u(host!, 'get_events', {
+        'lang': 'en',
+        'user_api_hash': hash!,
+        'date_from': dateFrom,
+        'date_to': dateTo,
+      })).timeout(const Duration(seconds: 25));
+      if (res.statusCode != 200) return out;
       final j = jsonDecode(res.body);
-      final box = (j is Map && j['items'] is Map) ? j['items'] : j;
-      final data = (box is Map && box['data'] is List) ? box['data'] : [];
+      // GPSWOX nests events at items.data[]; some servers return data[] or a bare list
+      List data = [];
+      if (j is List) {
+        data = j;
+      } else if (j is Map) {
+        if (j['items'] is Map && j['items']['data'] is List) {
+          data = j['items']['data'];
+        } else if (j['items'] is List) {
+          data = j['items'];
+        } else if (j['data'] is List) {
+          data = j['data'];
+        } else if (j['events'] is List) {
+          data = j['events'];
+        }
+      }
       for (final e in data) {
         if (e is! Map) continue;
         out.add({
-          'id': e['id'],
+          'id': e['id'] ?? e['event_id'] ?? '${e['device_id']}_${e['created_at'] ?? e['time']}',
           'device_id': e['device_id'],
-          'message': e['message'] ?? e['name'] ?? '',
-          'time': e['time'] ?? e['created_at'] ?? '',
+          'message': e['message'] ?? e['name'] ?? e['type'] ?? 'Alert',
+          'time': e['time'] ?? e['created_at'] ?? e['updated_at'] ?? '',
           'address': e['address'] ?? '',
           'speed': e['speed'],
         });
       }
-    }
+    } catch (_) {}
     return out;
+  }
+
+  /// Debug: returns the raw get_events response body (for troubleshooting).
+  static Future<String> getEventsRaw() async {
+    final now = DateTime.now();
+    final fromDay = now.subtract(const Duration(days: 7));
+    String dd(DateTime t) => '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
+    try {
+      final res = await http.get(_u(host!, 'get_events', {
+        'lang': 'en',
+        'user_api_hash': hash!,
+        'date_from': '${dd(fromDay)} 00:00:00',
+        'date_to': '${dd(now)} 23:59:59',
+      })).timeout(const Duration(seconds: 25));
+      return 'HTTP ${res.statusCode}\nhost: $host\n\n${res.body}';
+    } catch (e) {
+      return 'ERROR: $e';
+    }
   }
 
   /// USER plan/profile data.
