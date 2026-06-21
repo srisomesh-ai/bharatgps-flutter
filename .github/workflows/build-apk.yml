@@ -24,13 +24,25 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Save custom files before regenerating android
+        run: |
+          mkdir -p /tmp/keep
+          cp -r android/app/src/main/res/raw /tmp/keep/raw 2>/dev/null || true
+          cp android/app/google-services.json /tmp/keep/google-services.json 2>/dev/null || true
+
       - name: Remove committed android folder (let Flutter generate a clean one)
         run: rm -rf android
 
-      - name: Regenerate Android scaffolding (correct gradle for this Flutter)
+      - name: Regenerate Android scaffolding
         run: flutter create . --platforms=android --org com.bharatgps
 
-      - name: Apply app name + internet permission + cleartext
+      - name: Restore custom files
+        run: |
+          mkdir -p android/app/src/main/res/raw
+          cp -r /tmp/keep/raw/* android/app/src/main/res/raw/ 2>/dev/null || true
+          cp /tmp/keep/google-services.json android/app/google-services.json 2>/dev/null || true
+
+      - name: Patch manifest (name, internet, cleartext, notif permission)
         run: |
           python3 - <<'PY'
           import re
@@ -38,12 +50,69 @@ jobs:
           s=open(p).read()
           if 'android.permission.INTERNET' not in s:
               s=re.sub(r'(<manifest[^>]*>)', r'\1\n    <uses-permission android:name="android.permission.INTERNET"/>', s, count=1)
+          if 'POST_NOTIFICATIONS' not in s:
+              s=re.sub(r'(<manifest[^>]*>)', r'\1\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>', s, count=1)
           s=re.sub(r'android:label="[^"]*"', 'android:label="Bharat GPS Tracker"', s, count=1)
           if 'usesCleartextTraffic' not in s:
               s=re.sub(r'(<application)', r'\1 android:usesCleartextTraffic="true"', s, count=1)
           open(p,'w').write(s)
-          print('manifest patched OK')
+          print('manifest patched')
           PY
+
+      - name: Enable core library desugaring (required by flutter_local_notifications)
+        run: |
+          python3 - <<'PY'
+          import re
+          p='android/app/build.gradle'
+          s=open(p).read()
+
+          # 1) enable desugaring flag inside compileOptions
+          if 'coreLibraryDesugaringEnabled' not in s:
+              if re.search(r'compileOptions\s*\{', s):
+                  s=re.sub(r'(compileOptions\s*\{)', r'\1\n        coreLibraryDesugaringEnabled true', s, count=1)
+              else:
+                  # add a compileOptions block inside android { }
+                  s=re.sub(r'(android\s*\{)', r'\1\n    compileOptions {\n        coreLibraryDesugaringEnabled true\n        sourceCompatibility JavaVersion.VERSION_1_8\n        targetCompatibility JavaVersion.VERSION_1_8\n    }', s, count=1)
+
+          # 2) add the desugaring dependency
+          if 'desugar_jdk_libs' not in s:
+              if re.search(r'dependencies\s*\{', s):
+                  s=re.sub(r'(dependencies\s*\{)', r'\1\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"', s, count=1)
+              else:
+                  s=s.rstrip()+'\n\ndependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"\n}\n'
+
+          # 3) ensure minSdk >= 21 (desugaring + firebase need it)
+          s=re.sub(r'minSdk(Version)?\s+\d+', 'minSdk 21', s)
+          s=re.sub(r'minSdk(Version)?\s*=\s*\d+', 'minSdk = 21', s)
+          # handle flutter.minSdkVersion placeholder
+          s=s.replace('minSdk flutter.minSdkVersion', 'minSdk 21')
+          s=s.replace('minSdkVersion flutter.minSdkVersion', 'minSdk 21')
+
+          open(p,'w').write(s)
+          print('desugaring enabled')
+          PY
+
+      - name: Enable Firebase (google-services) only if config present
+        run: |
+          if [ -f android/app/google-services.json ]; then
+            echo "google-services.json found — enabling Firebase plugin"
+            python3 - <<'PY'
+          import re
+          p='android/app/build.gradle'
+          s=open(p).read()
+          if 'com.google.gms.google-services' not in s:
+              s=re.sub(r'(plugins\s*\{)', r'\1\n    id "com.google.gms.google-services"', s, count=1)
+          open(p,'w').write(s)
+          p2='android/settings.gradle'
+          s2=open(p2).read()
+          if 'com.google.gms.google-services' not in s2:
+              s2=re.sub(r'(plugins\s*\{)', r'\1\n    id "com.google.gms.google-services" version "4.4.1" apply false', s2, count=1)
+          open(p2,'w').write(s2)
+          print('Firebase plugin enabled')
+          PY
+          else
+            echo "No google-services.json — building without Firebase (notifications inactive)."
+          fi
 
       - name: Get dependencies
         run: flutter pub get
