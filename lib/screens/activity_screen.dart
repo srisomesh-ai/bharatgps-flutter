@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
 import 'history_map_screen.dart';
+import 'trips_screen.dart';
 
 class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key});
@@ -164,6 +165,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
           const SizedBox(width: 5),
           Text(agoText(u['time']), style: const TextStyle(fontSize: 11, color: AppColors.ink2)),
           const Spacer(),
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TripsScreen(device: u))),
+            child: const Row(children: [
+              Icon(Icons.route, size: 14, color: AppColors.violet),
+              SizedBox(width: 4),
+              Text('Trips', style: TextStyle(fontSize: 11, color: AppColors.violet, fontWeight: FontWeight.w700)),
+            ]),
+          ),
+          const SizedBox(width: 14),
           GestureDetector(
             onTap: () => _openHistory(u),
             child: const Row(children: [
