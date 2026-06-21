@@ -110,12 +110,12 @@ class ApiService {
       'online': d['online'],
       'speed': d['speed'] ?? 0,
       'lat': d['lat'] ?? d['latitude'],
-      'lng': d['lng'] ?? d['lon'] ?? d['longitude'],
+      'lng': d['lng'] ?? d['longitude'],
       'time': d['time'],
-      'course': d['course'] ?? 0,
-      'address': d['address'] ?? '',
-      'model': dd['model'] ?? d['model'] ?? '',
-      'plate': dd['plate_number'] ?? '',
+      'course': double.tryParse('${d['course'] ?? 0}') ?? 0,
+      'address': (d['address'] != null && d['address'].toString() != '-' && d['address'].toString().isNotEmpty) ? d['address'] : '',
+      'model': dd['device_model'] ?? dd['model'] ?? d['model'] ?? '',
+      'plate': dd['plate_number'] ?? d['plate'] ?? '',
       'icon_url': _iconUrl(d),
       'total_distance': d['total_distance'],
       'ts': {
@@ -126,6 +126,7 @@ class ApiService {
         'motion': xmlTag('motion'),
         'battery': xmlTag('batterylevel'),
         'rssi': xmlTag('rssi'),
+        'alarm': d['alarm'],
       },
     };
   }
@@ -421,6 +422,30 @@ class ApiService {
       if (res.statusCode == 200) {
         final j = jsonDecode(res.body);
         if (j is Map) return Map<String, dynamic>.from(j);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Reverse-geocode lat/lng -> readable address (OpenStreetMap Nominatim), cached.
+  static final Map<String, String> _geoCache = {};
+  static Future<String?> reverseGeocode(dynamic lat, dynamic lng) async {
+    final la = double.tryParse('$lat'), lo = double.tryParse('$lng');
+    if (la == null || lo == null) return null;
+    final key = '${la.toStringAsFixed(4)},${lo.toStringAsFixed(4)}';
+    if (_geoCache.containsKey(key)) return _geoCache[key];
+    try {
+      final res = await http.get(
+        Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&zoom=16&lat=$la&lon=$lo'),
+        headers: {'User-Agent': 'BharatGPS-App/1.0'},
+      ).timeout(const Duration(seconds: 12));
+      if (res.statusCode == 200) {
+        final j = jsonDecode(res.body);
+        final name = (j is Map) ? j['display_name']?.toString() : null;
+        if (name != null && name.isNotEmpty) {
+          _geoCache[key] = name;
+          return name;
+        }
       }
     } catch (_) {}
     return null;
