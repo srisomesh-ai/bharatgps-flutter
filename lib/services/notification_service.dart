@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -48,19 +49,9 @@ class NotificationService {
 
   /// Call once at app start (after Firebase.initializeApp).
   static Future<void> init() async {
-    // local notifications init
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidInit);
-    await _fln.initialize(initSettings);
-
-    // create a channel for every bundled sound up-front
-    for (final s in kAlertSounds) {
-      await _ensureChannel(s);
-    }
-
+    await _initLocal();
     // request permission (Android 13+)
     await FirebaseMessaging.instance.requestPermission(alert: true, badge: true, sound: true);
-
     // token
     _fcmToken = await FirebaseMessaging.instance.getToken();
     if (_fcmToken != null) registerToken(_fcmToken!);
@@ -68,9 +59,26 @@ class NotificationService {
       _fcmToken = t;
       registerToken(t);
     });
-
     // foreground messages -> show a local notification with the chosen sound
     FirebaseMessaging.onMessage.listen(_showFromMessage);
+    // in-app alert polling (works even without Firebase/webhook configured)
+    startEventPolling();
+  }
+
+  /// Local notifications + in-app polling only (when Firebase isn't configured).
+  static Future<void> initLocalOnly() async {
+    await _initLocal();
+    startEventPolling();
+  }
+
+  static Future<void> _initLocal() async {
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const initSettings = InitializationSettings(android: androidInit);
+    await _fln.initialize(initSettings);
+    // create a channel for every bundled sound up-front
+    for (final s in kAlertSounds) {
+      await _ensureChannel(s);
+    }
   }
 
   static AndroidNotificationChannel _channelFor(AlertSound s) {
@@ -146,6 +154,61 @@ class NotificationService {
     } catch (_) {
       // backend may not be deployed yet; ignore silently
     }
+  }
+
+  // ===== In-app alert polling (works without Firebase/webhook) =====
+  // Checks recent events every 30s while the app is open and shows a local
+  // notification for any new alert. This makes app alerts work immediately.
+  static Timer? _pollTimer;
+  static final Set<String> _seenEvents = {};
+  static bool _primed = false;
+
+  static void startEventPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _checkEvents());
+    _checkEvents();
+  }
+
+  static void stopEventPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  static Future<void> _checkEvents() async {
+    if (!ApiService.isLoggedIn) return;
+    try {
+      final events = await ApiService.getEvents();
+      // first run: remember existing events without notifying (avoid a flood)
+      if (!_primed) {
+        for (final e in events) {
+          _seenEvents.add('${e['id']}');
+        }
+        _primed = true;
+        return;
+      }
+      for (final e in events) {
+        final id = '${e['id']}';
+        if (_seenEvents.contains(id)) continue;
+        _seenEvents.add(id);
+        final msg = (e['message'] ?? 'Vehicle alert').toString();
+        await _showLocal(msg, (e['address'] ?? '').toString());
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> _showLocal(String title, String body) async {
+    final sound = await currentSound();
+    final details = AndroidNotificationDetails(
+      'bgps_alerts_${sound.id}',
+      'Alerts — ${sound.label}',
+      channelDescription: 'BharatGPS vehicle alerts',
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: true,
+      sound: sound.file == 'default' ? null : RawResourceAndroidNotificationSound(sound.file),
+      icon: '@mipmap/ic_launcher',
+    );
+    await _fln.show(DateTime.now().millisecondsSinceEpoch ~/ 1000, title, body, NotificationDetails(android: details));
   }
 }
 
