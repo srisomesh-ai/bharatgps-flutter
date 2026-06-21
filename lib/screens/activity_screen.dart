@@ -55,15 +55,13 @@ class _ActivityScreenState extends State<ActivityScreen> {
       if (s != 'of') active++;
     }
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(children: [
+      body: Column(children: [
           Container(
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppColors.teal, AppColors.teal2]),
             ),
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 12, 16, 16),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)), padding: const EdgeInsets.all(3), child: Image.asset('assets/logo-icon.png', errorBuilder: (_, __, ___) => const Icon(Icons.location_on, color: AppColors.teal, size: 20))),
@@ -100,7 +98,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   ),
           ),
         ]),
-      ),
       bottomNavigationBar: const BottomNav(current: 1),
     );
   }
