@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
+import '../widgets/loaders.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -119,7 +120,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // ===== LIST =====
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: AppColors.teal))
+                ? const SignalLoader(label: 'Loading your fleet…')
                 : RefreshIndicator(
                     onRefresh: _load,
                     child: ListView.builder(
