@@ -75,9 +75,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Row(
                   children: [
-                    // hamburger
-                    Column(mainAxisSize: MainAxisSize.min, children: List.generate(3, (i) => Container(width: 22, height: 2.4, margin: const EdgeInsets.symmetric(vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2))))),
-                    const SizedBox(width: 13),
                     Container(width: 36, height: 36, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)), padding: const EdgeInsets.all(3), child: Image.asset('assets/logo-icon.png', errorBuilder: (_, __, ___) => const Icon(Icons.location_on, color: AppColors.teal, size: 22))),
                     const SizedBox(width: 9),
                     const Text('Bharat GPS Tracker', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
@@ -215,11 +212,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           children: [
             Row(children: [
-              Container(
-                width: 50, height: 50,
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Color(0x140E5C5C), blurRadius: 5)]),
-                child: Center(child: vehicleThumb(u['icon_url'], size: 42)),
-              ),
+              vehicleBox(u['icon_url'], box: 50, bg: stateBg(s)),
               const SizedBox(width: 11),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(u['name'] ?? 'Vehicle', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
@@ -231,24 +224,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 decoration: BoxDecoration(color: stateColor(s), shape: BoxShape.circle, boxShadow: [BoxShadow(color: stateBg(s), blurRadius: 0, spreadRadius: 4)]),
               ),
             ]),
-            Container(margin: const EdgeInsets.only(top: 11), padding: const EdgeInsets.only(top: 10), decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x0D000000)))),
-              child: Row(children: [
-                const Icon(Icons.schedule, size: 13, color: AppColors.teal),
-                const SizedBox(width: 5),
-                Text(spd, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.ink)),
-                const Spacer(),
-                const Icon(Icons.place, size: 13, color: AppColors.teal),
-                const SizedBox(width: 4),
-                Flexible(child: Text(addr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ink2))),
-                const Spacer(),
-                const Icon(Icons.access_time, size: 13, color: AppColors.teal),
-                const SizedBox(width: 4),
-                Text(agoText(u['time']), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ink2)),
+            Container(
+              margin: const EdgeInsets.only(top: 11),
+              padding: const EdgeInsets.only(top: 10),
+              decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x0D000000)))),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _metaCol('SPEED', Icons.speed, spd, CrossAxisAlignment.start, TextAlign.left),
+                _metaCol('LOCATION', Icons.place, addr, CrossAxisAlignment.center, TextAlign.center),
+                _metaCol('UPDATED', Icons.access_time, agoText(u['time']), CrossAxisAlignment.end, TextAlign.right),
               ]),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _metaCol(String label, IconData ic, String value, CrossAxisAlignment align, TextAlign ta) {
+    return Expanded(
+      child: Column(crossAxisAlignment: align, children: [
+        Text(label, style: const TextStyle(fontSize: 8.5, color: AppColors.muted, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
+        const SizedBox(height: 3),
+        Row(mainAxisAlignment: align == CrossAxisAlignment.start ? MainAxisAlignment.start : (align == CrossAxisAlignment.end ? MainAxisAlignment.end : MainAxisAlignment.center), children: [
+          Icon(ic, size: 12, color: AppColors.teal),
+          const SizedBox(width: 4),
+          Flexible(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: ta, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink))),
+        ]),
+      ]),
     );
   }
 }
