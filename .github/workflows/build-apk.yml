@@ -47,6 +47,23 @@ jobs:
           echo "---- android/app ----"; ls -la android/app | grep -i gradle || true
           echo "---- android ----"; ls -la android | grep -i gradle || true
 
+      - name: Clean res/raw (keep only valid sound resources)
+        run: |
+          if [ -d android/app/src/main/res/raw ]; then
+            cd android/app/src/main/res/raw
+            for f in *; do
+              [ -e "$f" ] || continue
+              # keep only lowercase a-z, 0-9, underscore filenames with audio extensions
+              if echo "$f" | grep -Eq '^[a-z0-9_]+\.(mp3|ogg|wav)$'; then
+                echo "keep $f"
+              else
+                echo "removing invalid raw resource: $f"
+                rm -f "$f"
+              fi
+            done
+            cd - >/dev/null
+          fi
+
       - name: Patch manifest (name, internet, cleartext, notif permission)
         run: |
           python3 - <<'PY'
