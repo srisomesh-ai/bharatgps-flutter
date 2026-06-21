@@ -169,21 +169,31 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   double _toD(dynamic v) => double.tryParse('$v') ?? 0;
 
-  // fading tail trail behind moving vehicles (teal, thickening toward the vehicle)
+  // tail trail from the server's `tail` array (always available), fading teal
   List<Polyline> _tailPolylines() {
     final out = <Polyline>[];
-    _tail.forEach((id, pts) {
-      if (pts.length < 2) return;
+    final visible = _devices.where((u) {
+      if (_search.isEmpty) return true;
+      return (u['name'] ?? '').toString().toLowerCase().contains(_search);
+    });
+    for (final u in visible) {
+      final tail = (u['tail'] as List?) ?? [];
+      if (tail.length < 2) continue;
+      final pts = tail.map((p) => LatLng((p['lat'] as num).toDouble(), (p['lng'] as num).toDouble())).toList();
+      // add the current animated/live position as the final tail point
+      final id = '${u['id']}';
+      final live = _animPos[id];
+      if (live != null) pts.add(live);
       final n = pts.length;
       for (int i = 1; i < n; i++) {
         final frac = i / (n - 1);
         out.add(Polyline(
           points: [pts[i - 1], pts[i]],
-          color: AppColors.teal.withOpacity((0.10 + frac * 0.6).clamp(0.0, 1.0)),
+          color: AppColors.teal.withOpacity((0.12 + frac * 0.55).clamp(0.0, 1.0)),
           strokeWidth: 2 + frac * 3,
         ));
       }
-    });
+    }
     return out;
   }
 
