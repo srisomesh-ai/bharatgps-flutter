@@ -165,6 +165,8 @@ class NotificationService {
 
   static void startEventPolling() {
     _pollTimer?.cancel();
+    _primed = false;
+    _seenEvents.clear();
     _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _checkEvents());
     _checkEvents();
   }
@@ -178,10 +180,17 @@ class NotificationService {
     if (!ApiService.isLoggedIn) return;
     try {
       final events = await ApiService.getEvents();
-      // first run: remember existing events without notifying (avoid a flood)
+      // first run: mark old events as seen, but still notify VERY recent ones
+      // (last 3 min) so a freshly-fired alert shows during testing.
       if (!_primed) {
+        final cutoff = DateTime.now().subtract(const Duration(minutes: 3));
         for (final e in events) {
           _seenEvents.add('${e['id']}');
+          final t = DateTime.tryParse('${e['time']}'.replaceFirst(' ', 'T'));
+          if (t != null && t.isAfter(cutoff)) {
+            final msg = (e['message'] ?? 'Vehicle alert').toString();
+            await _showLocal(msg, (e['address'] ?? '').toString());
+          }
         }
         _primed = true;
         return;
