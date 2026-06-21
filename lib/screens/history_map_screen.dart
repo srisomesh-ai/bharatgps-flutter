@@ -86,10 +86,20 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
   Widget build(BuildContext context) {
     final cur = _points.isNotEmpty ? _points[_idx] : null;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.device['name'] ?? 'Travel History'),
-      ),
       body: Column(children: [
+        // teal header (full cover, matches other screens)
+        Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.teal, AppColors.teal2])),
+          padding: EdgeInsets.fromLTRB(8, MediaQuery.of(context).padding.top + 8, 16, 14),
+          child: Row(children: [
+            IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back, color: Colors.white)),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Route Playback', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
+              Text(widget.device['name'] ?? 'Travel History', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            ])),
+          ]),
+        ),
         Expanded(
           child: Stack(children: [
             FlutterMap(
