@@ -8,9 +8,9 @@ class ApiService {
   static const servers = ['bharatgps.com', 'bharatgps.in', 'bharatgps.school'];
 
   /// The server that hosts the push notification PHP files (register_token.php,
-  /// alert_webhook.php). This is YOUR Hostinger domain that you control — NOT the
-  /// GPSWOX panel (which you can't put files on). Change this to your real domain.
-  static const pushServer = 'hamaraservice.com';
+  /// alert_webhook.php). This is the user's own Hostinger panel domain (full file
+  /// access), NOT the GPSWOX tracking server.
+  static const pushServer = 'lightcyan-hare-594583.hostingersite.com';
 
   static String? hash;
   static String? host;
