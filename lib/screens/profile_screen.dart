@@ -75,13 +75,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final name = ApiService.userName ?? 'BharatGPS User';
     final email = ApiService.userEmail ?? '';
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(children: [
+      body: Column(children: [
           Container(
             width: double.infinity,
             decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppColors.teal, AppColors.teal2])),
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 60),
+            padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 12, 16, 60),
             child: Row(children: [
               Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)), padding: const EdgeInsets.all(3), child: Image.asset('assets/logo-icon.png', errorBuilder: (_, __, ___) => const Icon(Icons.location_on, color: AppColors.teal, size: 20))),
               const SizedBox(width: 9),
@@ -178,7 +176,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ]),
-      ),
       bottomNavigationBar: const BottomNav(current: 4),
     );
   }
