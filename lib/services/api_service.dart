@@ -118,7 +118,13 @@ class ApiService {
       'plate': dd['plate_number'] ?? d['plate'] ?? '',
       'icon_url': _iconUrl(d),
       'total_distance': d['total_distance'],
-      'expiry': dd['expiration_date'] ?? d['expiration_date'],
+      'expiry': _firstValidDate([dd['expiration_date'], d['expiration_date'], d['sim_expiration_date'], dd['sim_expiration_date']]),
+      'tail': (d['tail'] is List)
+          ? (d['tail'] as List)
+              .where((p) => p is Map && p['lat'] != null && p['lng'] != null)
+              .map((p) => {'lat': double.tryParse('${p['lat']}') ?? 0, 'lng': double.tryParse('${p['lng']}') ?? 0})
+              .toList()
+          : [],
       'ts': {
         'ignition': xmlTag('ignition'),
         'charge': xmlTag('charge'),
@@ -130,6 +136,17 @@ class ApiService {
         'alarm': d['alarm'],
       },
     };
+  }
+
+  // returns the first non-empty, non-zero date string, else null
+  static String? _firstValidDate(List<dynamic> candidates) {
+    for (final c in candidates) {
+      if (c == null) continue;
+      final s = c.toString().trim();
+      if (s.isEmpty || s.startsWith('0000') || s == 'null') continue;
+      return s;
+    }
+    return null;
   }
 
   static String? _iconUrl(Map d) {
@@ -385,15 +402,16 @@ class ApiService {
 
   /// EVENTS history (last 7 days default).
   static Future<List<Map<String, dynamic>>> getEvents() async {
-    final to = DateTime.now();
-    final from = to.subtract(const Duration(days: 7));
-    String fmt(DateTime t) =>
-        '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')} ${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:00';
+    final now = DateTime.now();
+    final fromDay = now.subtract(const Duration(days: 7));
+    String dd(DateTime t) => '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
+    final dateFrom = '${dd(fromDay)} 00:00:00';
+    final dateTo = '${dd(now)} 23:59:59';
     final res = await http.get(_u(host!, 'get_events', {
       'lang': 'en',
       'user_api_hash': hash!,
-      'date_from': fmt(from),
-      'date_to': fmt(to),
+      'date_from': dateFrom,
+      'date_to': dateTo,
     })).timeout(const Duration(seconds: 25));
     final out = <Map<String, dynamic>>[];
     if (res.statusCode == 200) {
@@ -405,7 +423,7 @@ class ApiService {
         out.add({
           'id': e['id'],
           'device_id': e['device_id'],
-          'message': e['message'] ?? '',
+          'message': e['message'] ?? e['name'] ?? '',
           'time': e['time'] ?? e['created_at'] ?? '',
           'address': e['address'] ?? '',
           'speed': e['speed'],
