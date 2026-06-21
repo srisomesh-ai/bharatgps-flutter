@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
 import 'history_map_screen.dart';
+import '../widgets/loaders.dart';
 
 class TripsScreen extends StatefulWidget {
   final Map<String, dynamic> device;
@@ -89,7 +90,7 @@ class _TripsScreenState extends State<TripsScreen> {
         ),
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.teal))
+              ? const RouteLoader()
               : _trips.isEmpty
                   ? Center(
                       child: Column(mainAxisSize: MainAxisSize.min, children: const [
