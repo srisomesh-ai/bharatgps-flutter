@@ -150,7 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _menu(Icons.business_outlined, 'Company Information', 'Manage company details'),
                         _menu(Icons.group_outlined, 'User Management', 'Manage users and permissions'),
                         _menu(Icons.credit_card, 'Subscription & Billing', 'View invoices and payment history'),
-                        _menu(Icons.notifications_none, 'Notification Settings', 'Manage alert preferences'),
+                        _menu(Icons.notifications_none, 'Notification Settings', 'Manage alert preferences', onTap: () => Navigator.pushNamed(context, '/notification-settings')),
                         _menu(Icons.shield_outlined, 'Security', 'Change password and security'),
                         _menu(Icons.help_outline, 'Help & Support', 'FAQs, guides and contact support'),
                         _menu(Icons.info_outline, 'About Bharat GPS Tracker', 'App version and information', last: true),
@@ -192,8 +192,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ]),
       );
 
-  Widget _menu(IconData ic, String title, String sub, {bool last = false}) => InkWell(
-        onTap: () => _soon(title),
+  Widget _menu(IconData ic, String title, String sub, {bool last = false, VoidCallback? onTap}) => InkWell(
+        onTap: onTap ?? () => _soon(title),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           decoration: BoxDecoration(border: last ? null : const Border(bottom: BorderSide(color: AppColors.line))),
