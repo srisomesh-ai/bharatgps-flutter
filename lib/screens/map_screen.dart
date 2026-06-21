@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../theme/app_theme.dart';
@@ -13,7 +14,7 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   final MapController _map = MapController();
   List<Map<String, dynamic>> _devices = [];
   bool _loading = true;
@@ -25,6 +26,19 @@ class _MapScreenState extends State<MapScreen> {
   Timer? _refresh;
   final Map<String, String> _addrCache = {};
 
+  // ===== glide engine state =====
+  // per-vehicle animated position + animation source/target + tail trail
+  final Map<String, LatLng> _animPos = {};   // current on-screen position
+  final Map<String, LatLng> _srcPos = {};     // glide start
+  final Map<String, LatLng> _dstPos = {};     // glide target
+  final Map<String, double> _heading = {};    // current heading (deg)
+  final Map<String, List<LatLng>> _tail = {}; // trail points (only while moving)
+  Ticker? _ticker;
+  int _glideStartMs = 0;
+  double _pulseValue = 0; // 0..1 pulse phase for running markers
+  static const _glideMs = 5000;   // matches web GLIDE_MS / POLL_MS
+  static const _maxTail = 40;
+
   @override
   void initState() {
     super.initState();
@@ -32,11 +46,54 @@ class _MapScreenState extends State<MapScreen> {
     _loadGprs();
     // live refresh every 5 seconds (like the web POLL_MS)
     _refresh = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
+    // glide engine: advance animated positions every frame
+    _ticker = createTicker(_onTick)..start();
+  }
+
+  void _onTick(Duration elapsed) {
+    // pulse phase (1.6s loop) for running-vehicle glow
+    _pulseValue = (elapsed.inMilliseconds % 1600) / 1600.0;
+    if (_dstPos.isEmpty) {
+      if (mounted) setState(() {});
+      return;
+    }
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final k = ((now - _glideStartMs) / _glideMs).clamp(0.0, 1.0);
+    for (final id in _dstPos.keys) {
+      final src = _srcPos[id], dst = _dstPos[id];
+      if (src == null || dst == null) continue;
+      final lat = src.latitude + (dst.latitude - src.latitude) * k;
+      final lng = src.longitude + (dst.longitude - src.longitude) * k;
+      final np = LatLng(lat, lng);
+      _animPos[id] = np;
+      // drop tail points while gliding (only for moving vehicles)
+      final dev = _devices.firstWhere((e) => '${e['id']}' == id, orElse: () => {});
+      final moving = dev.isNotEmpty && stateOf(dev['online'], dev['speed']) == 'rn';
+      if (moving) {
+        final t = _tail.putIfAbsent(id, () => []);
+        if (t.isEmpty || _dist(t.last, np) > 0.00002) {
+          t.add(np);
+          if (t.length > _maxTail) t.removeAt(0);
+        }
+        // follow selected vehicle
+        if (_selected != null && '${_selected!['id']}' == id) {
+          _map.move(np, _map.camera.zoom);
+        }
+      }
+    }
+    // rebuild every frame so glide + pulse animate smoothly
+    if (mounted) setState(() {});
+  }
+
+  double _dist(LatLng a, LatLng b) {
+    final dx = a.latitude - b.latitude, dy = a.longitude - b.longitude;
+    return dx * dx + dy * dy;
   }
 
   @override
   void dispose() {
     _refresh?.cancel();
+    _ticker?.dispose();
     super.dispose();
   }
 
@@ -54,6 +111,21 @@ class _MapScreenState extends State<MapScreen> {
       final match = d.firstWhere((e) => '${e['id']}' == '${_selected!['id']}', orElse: () => {});
       if (match.isNotEmpty) _selected = match;
     }
+    // set up glide: each vehicle animates from current anim position to new GPS target
+    for (final u in d) {
+      if (u['lat'] == null || u['lng'] == null) continue;
+      final id = '${u['id']}';
+      final target = LatLng(_toD(u['lat']), _toD(u['lng']));
+      final cur = _animPos[id] ?? target;
+      _srcPos[id] = cur;
+      _dstPos[id] = target;
+      _animPos[id] ??= target;
+      _heading[id] = _toD(u['course']).toDouble();
+      // reset tail if vehicle is not moving
+      final moving = stateOf(u['online'], u['speed']) == 'rn';
+      if (!moving) _tail[id] = [];
+    }
+    _glideStartMs = DateTime.now().millisecondsSinceEpoch;
     setState(() {
       _devices = d;
       _loading = false;
@@ -96,6 +168,24 @@ class _MapScreenState extends State<MapScreen> {
 
   double _toD(dynamic v) => double.tryParse('$v') ?? 0;
 
+  // fading tail trail behind moving vehicles (teal, thickening toward the vehicle)
+  List<Polyline> _tailPolylines() {
+    final out = <Polyline>[];
+    _tail.forEach((id, pts) {
+      if (pts.length < 2) return;
+      final n = pts.length;
+      for (int i = 1; i < n; i++) {
+        final frac = i / (n - 1);
+        out.add(Polyline(
+          points: [pts[i - 1], pts[i]],
+          color: AppColors.teal.withOpacity((0.10 + frac * 0.6).clamp(0.0, 1.0)),
+          strokeWidth: 2 + frac * 3,
+        ));
+      }
+    });
+    return out;
+  }
+
   List<Marker> _markers() {
     final visible = _devices.where((u) {
       if (u['lat'] == null || u['lng'] == null) return false;
@@ -104,17 +194,19 @@ class _MapScreenState extends State<MapScreen> {
     });
     return visible.map((u) {
       final s = stateOf(u['online'], u['speed']);
-      final heading = (_toD(u['course'])).toDouble();
+      final id = '${u['id']}';
+      final pos = _animPos[id] ?? LatLng(_toD(u['lat']), _toD(u['lng']));
+      final heading = _heading[id] ?? _toD(u['course']).toDouble();
       return Marker(
-        point: LatLng(_toD(u['lat']), _toD(u['lng'])),
+        point: pos,
         width: 90,
         height: 90,
         child: GestureDetector(
           onTap: () {
             setState(() => _selected = u);
-            _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), _map.camera.zoom < 13 ? 14 : _map.camera.zoom);
+            _map.move(pos, _map.camera.zoom < 13 ? 14 : _map.camera.zoom);
           },
-          child: _VehicleMarker(device: u, state: s, heading: heading),
+          child: _VehicleMarker(device: u, state: s, heading: heading, pulse: _pulseValue),
         ),
       );
     }).toList();
@@ -231,6 +323,7 @@ class _MapScreenState extends State<MapScreen> {
                     subdomains: const ['a', 'b', 'c', 'd'],
                     userAgentPackageName: 'com.bharatgps.app',
                   ),
+                  PolylineLayer(polylines: _tailPolylines()),
                   MarkerLayer(markers: _markers()),
                 ],
               ),
@@ -378,36 +471,17 @@ class _MapScreenState extends State<MapScreen> {
 }
 
 // ===== Custom vehicle marker (plate above, pic center, tag below, live pulse) =====
-class _VehicleMarker extends StatefulWidget {
+class _VehicleMarker extends StatelessWidget {
   final Map<String, dynamic> device;
   final String state;
   final double heading;
-  const _VehicleMarker({required this.device, required this.state, required this.heading});
-  @override
-  State<_VehicleMarker> createState() => _VehicleMarkerState();
-}
-
-class _VehicleMarkerState extends State<_VehicleMarker> with SingleTickerProviderStateMixin {
-  AnimationController? _pulse;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.state == 'rn') {
-      _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat();
-    }
-  }
-
-  @override
-  void dispose() {
-    _pulse?.dispose();
-    super.dispose();
-  }
+  final double pulse; // 0..1 from parent ticker
+  const _VehicleMarker({required this.device, required this.state, required this.heading, required this.pulse});
 
   @override
   Widget build(BuildContext context) {
-    final s = widget.state;
-    final u = widget.device;
+    final s = state;
+    final u = device;
     final tagText = s == 'rn' ? '${u['speed'] ?? 0} km/h' : stateLabels[s]!;
     return SizedBox(
       width: 90,
@@ -415,18 +489,12 @@ class _VehicleMarkerState extends State<_VehicleMarker> with SingleTickerProvide
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // live pulse
-          if (_pulse != null)
-            AnimatedBuilder(
-              animation: _pulse!,
-              builder: (_, __) {
-                final v = _pulse!.value;
-                return Container(
-                  width: 34 * (0.5 + v * 1.7),
-                  height: 34 * (0.5 + v * 1.7),
-                  decoration: BoxDecoration(color: AppColors.green.withOpacity((1 - v) * 0.35), shape: BoxShape.circle),
-                );
-              },
+          // live pulse (only running)
+          if (s == 'rn')
+            Container(
+              width: 34 * (0.5 + pulse * 1.7),
+              height: 34 * (0.5 + pulse * 1.7),
+              decoration: BoxDecoration(color: AppColors.green.withOpacity((1 - pulse) * 0.35), shape: BoxShape.circle),
             ),
           // plate label above
           Positioned(
@@ -439,7 +507,7 @@ class _VehicleMarkerState extends State<_VehicleMarker> with SingleTickerProvide
           ),
           // vehicle pic (rotated by heading)
           Transform.rotate(
-            angle: widget.heading * 3.14159265 / 180.0,
+            angle: heading * 3.14159265 / 180.0,
             child: SizedBox(width: 46, height: 46, child: vehicleThumb(u['icon_url'], size: 46)),
           ),
           // status tag below
