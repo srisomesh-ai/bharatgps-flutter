@@ -133,7 +133,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 10)]),
       child: Column(children: [
         Row(children: [
-          Container(width: 46, height: 46, decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(12)), child: Center(child: vehicleThumb(u['icon_url'], size: 38))),
+          vehicleBox(u['icon_url'], box: 46, bg: stateBg(s)),
           const SizedBox(width: 11),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(u['name'] ?? 'Vehicle', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
