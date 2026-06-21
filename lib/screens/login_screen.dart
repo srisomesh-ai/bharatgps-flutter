@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -35,6 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final res = await ApiService.login(_email.text.trim(), _pass.text);
     if (!mounted) return;
     if (res['ok'] == true) {
+      NotificationService.startEventPolling();
       Navigator.pushReplacementNamed(context, '/dashboard');
     } else {
       setState(() {
