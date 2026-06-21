@@ -38,6 +38,46 @@ void main() async {
   runApp(const BharatGpsApp());
 }
 
+// Back-button behavior:
+// - On a non-dashboard main tab: back goes to Dashboard.
+// - On Dashboard: first back shows "press again to exit", second back minimizes app.
+class _BackHandler extends StatefulWidget {
+  final Widget child;
+  final bool isDashboard;
+  const _BackHandler({required this.child, this.isDashboard = false});
+  @override
+  State<_BackHandler> createState() => _BackHandlerState();
+}
+
+class _BackHandlerState extends State<_BackHandler> {
+  DateTime? _lastBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        if (!widget.isDashboard) {
+          Navigator.pushReplacementNamed(context, '/dashboard');
+          return;
+        }
+        // dashboard: double-back to minimize
+        final now = DateTime.now();
+        if (_lastBack == null || now.difference(_lastBack!) > const Duration(seconds: 2)) {
+          _lastBack = now;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Press back again to exit'), duration: Duration(seconds: 2)),
+          );
+        } else {
+          SystemNavigator.pop(); // minimize / close
+        }
+      },
+      child: widget.child,
+    );
+  }
+}
+
 class BharatGpsApp extends StatelessWidget {
   const BharatGpsApp({super.key});
 
@@ -50,11 +90,11 @@ class BharatGpsApp extends StatelessWidget {
       initialRoute: ApiService.isLoggedIn ? '/dashboard' : '/login',
       routes: {
         '/login': (_) => const LoginScreen(),
-        '/dashboard': (_) => const DashboardScreen(),
-        '/activity': (_) => const ActivityScreen(),
-        '/map': (_) => const MapScreen(),
-        '/alerts': (_) => const AlertsScreen(),
-        '/profile': (_) => const ProfileScreen(),
+        '/dashboard': (_) => const _BackHandler(isDashboard: true, child: DashboardScreen()),
+        '/activity': (_) => const _BackHandler(child: ActivityScreen()),
+        '/map': (_) => const _BackHandler(child: MapScreen()),
+        '/alerts': (_) => const _BackHandler(child: AlertsScreen()),
+        '/profile': (_) => const _BackHandler(child: ProfileScreen()),
         '/notification-settings': (_) => const NotificationSettingsScreen(),
       },
     );
