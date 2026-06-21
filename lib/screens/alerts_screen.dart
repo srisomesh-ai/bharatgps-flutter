@@ -64,24 +64,6 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
     });
   }
 
-  Future<void> _showDebug() async {
-    showDialog(context: context, builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.teal)));
-    final raw = await ApiService.getEventsRaw();
-    if (!mounted) return;
-    Navigator.pop(context);
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Server response', style: TextStyle(fontSize: 15)),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(child: SelectableText(raw, style: const TextStyle(fontSize: 11, fontFamily: 'monospace'))),
-        ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
-      ),
-    );
-  }
-
   static const _typeMeta = {
     'overspeed': {'name': 'Over Speed Alert', 'icon': Icons.speed, 'color': AppColors.red, 'bg': AppColors.redBg},
     'move_duration': {'name': 'Movement Alert', 'icon': Icons.trending_flat, 'color': AppColors.blue, 'bg': AppColors.blueBg},
@@ -95,15 +77,13 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(children: [
+      body: Column(children: [
           Container(
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppColors.teal, AppColors.teal2]),
             ),
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 12, 16, 0),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)), padding: const EdgeInsets.all(3), child: Image.asset('assets/logo-icon.png', errorBuilder: (_, __, ___) => const Icon(Icons.location_on, color: AppColors.teal, size: 20))),
@@ -131,7 +111,6 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
             ]),
           ),
         ]),
-      ),
       floatingActionButton: AnimatedBuilder(
         animation: _tab,
         builder: (_, __) => _tab.index == 0
@@ -233,13 +212,6 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 40),
             child: Text('Triggered alerts from the last 7 days appear here. An alert must actually fire (a vehicle does the thing) to create an event.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: AppColors.muted)),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: _showDebug,
-            icon: const Icon(Icons.bug_report_outlined, size: 16),
-            label: const Text('Check server response'),
-            style: OutlinedButton.styleFrom(foregroundColor: AppColors.teal, side: const BorderSide(color: AppColors.line)),
           ),
         ]),
       );
