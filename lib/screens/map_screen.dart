@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
 import 'troubleshoot_sheet.dart';
 import 'history_map_screen.dart';
+import '../widgets/loaders.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -341,13 +342,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               if (_loading)
                 Container(
                   color: AppColors.bg,
-                  child: const Center(
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      CircularProgressIndicator(color: AppColors.teal),
-                      SizedBox(height: 14),
-                      Text('Loading live map…', style: TextStyle(color: AppColors.muted, fontSize: 16)),
-                    ]),
-                  ),
+                  child: const SatelliteLoader(label: 'Locating vehicles…'),
                 ),
               // floating controls
               Positioned(
