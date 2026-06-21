@@ -28,8 +28,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _devices = d;
         _loading = false;
       });
+      _resolveAddresses(d);
     } catch (_) {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _resolveAddresses(List<Map<String, dynamic>> devs) async {
+    for (final u in devs) {
+      if ((u['address'] ?? '').toString().isNotEmpty) continue;
+      if (u['lat'] == null || u['lng'] == null) continue;
+      final name = await ApiService.reverseGeocode(u['lat'], u['lng']);
+      if (name != null && mounted) setState(() => u['address'] = name);
     }
   }
 
