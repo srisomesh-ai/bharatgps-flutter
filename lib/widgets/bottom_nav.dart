@@ -62,3 +62,33 @@ Widget vehicleThumb(String? iconUrl, {double size = 42}) {
   }
   return Icon(Icons.local_shipping, size: size * 0.7, color: AppColors.teal);
 }
+
+// Professional vehicle image box: tinted background, image fitted, white bg dropped via blend.
+Widget vehicleBox(String? iconUrl, {double box = 50, Color? bg}) {
+  final tint = bg ?? const Color(0xFFEAF3F1);
+  Widget inner;
+  if (iconUrl != null && iconUrl.isNotEmpty) {
+    inner = Image.network(
+      iconUrl,
+      width: box * 0.82,
+      height: box * 0.82,
+      fit: BoxFit.contain,
+      // multiply drops white backgrounds; transparent icons are unaffected
+      color: null,
+      colorBlendMode: BlendMode.multiply,
+      errorBuilder: (_, __, ___) => Icon(Icons.local_shipping, size: box * 0.5, color: AppColors.teal),
+    );
+  } else {
+    inner = Icon(Icons.local_shipping, size: box * 0.5, color: AppColors.teal);
+  }
+  return Container(
+    width: box,
+    height: box,
+    decoration: BoxDecoration(
+      gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [tint, Colors.white]),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Center(child: inner),
+  );
+}
