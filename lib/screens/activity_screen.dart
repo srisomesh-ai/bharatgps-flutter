@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
 import 'history_map_screen.dart';
 import 'trips_screen.dart';
+import '../widgets/loaders.dart';
 
 class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key});
@@ -76,7 +77,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: AppColors.teal))
+                ? const SpeedoLoader()
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                     children: [
