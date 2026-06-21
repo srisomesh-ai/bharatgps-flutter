@@ -118,6 +118,7 @@ class ApiService {
       'plate': dd['plate_number'] ?? d['plate'] ?? '',
       'icon_url': _iconUrl(d),
       'total_distance': d['total_distance'],
+      'expiry': dd['expiration_date'] ?? d['expiration_date'],
       'ts': {
         'ignition': xmlTag('ignition'),
         'charge': xmlTag('charge'),
