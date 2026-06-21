@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
 import 'troubleshoot_sheet.dart';
+import 'history_map_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -688,7 +689,15 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
               )),
               const SizedBox(width: 10),
               Expanded(child: OutlinedButton.icon(
-                onPressed: () => Navigator.pushReplacementNamed(context, '/activity'),
+                onPressed: () {
+                  Navigator.pop(context);
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => _PlaybackPicker(device: u),
+                  );
+                },
                 icon: const Icon(Icons.play_circle_outline, size: 18),
                 label: const Text('Playback'),
                 style: OutlinedButton.styleFrom(foregroundColor: AppColors.ink2, side: const BorderSide(color: AppColors.line), padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
@@ -788,4 +797,44 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
           Flexible(child: Text(v, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.right, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: valColor ?? AppColors.ink))),
         ]),
       );
+}
+
+// Quick day picker -> opens route playback for ONE specific vehicle
+class _PlaybackPicker extends StatelessWidget {
+  final Map<String, dynamic> device;
+  const _PlaybackPicker({required this.device});
+
+  @override
+  Widget build(BuildContext context) {
+    final presets = {'Today': 1, '7 Days': 7, '14 Days': 14, '30 Days': 30};
+    return Container(
+      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      padding: EdgeInsets.fromLTRB(20, 10, 20, 20 + MediaQuery.of(context).padding.bottom),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Center(child: Container(width: 38, height: 5, margin: const EdgeInsets.only(bottom: 14), decoration: BoxDecoration(color: const Color(0xFFE2E9E8), borderRadius: BorderRadius.circular(3)))),
+        Row(children: [
+          const Icon(Icons.play_circle_outline, color: AppColors.teal),
+          const SizedBox(width: 8),
+          Expanded(child: Text('Playback · ${device['name'] ?? 'Vehicle'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+          GestureDetector(onTap: () => Navigator.pop(context), child: Container(width: 32, height: 32, decoration: const BoxDecoration(color: AppColors.bg, shape: BoxShape.circle), child: const Icon(Icons.close, size: 16, color: AppColors.ink2))),
+        ]),
+        const SizedBox(height: 16),
+        const Text('SELECT PERIOD', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink2, letterSpacing: 0.4)),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: presets.entries.map((e) {
+          return GestureDetector(
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => HistoryMapScreen(device: device, days: e.value)));
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E9E8), width: 1.6)),
+              child: Text(e.key, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.ink)),
+            ),
+          );
+        }).toList()),
+      ]),
+    );
+  }
 }
