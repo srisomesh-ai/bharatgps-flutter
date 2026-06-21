@@ -141,7 +141,7 @@ class NotificationService {
     final sound = await currentSound();
     try {
       await http.post(
-        Uri.https(ApiService.host!, '/push/register_token.php'),
+        Uri.https(ApiService.pushServer, '/push/register_token.php'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'user_api_hash': ApiService.hash,
