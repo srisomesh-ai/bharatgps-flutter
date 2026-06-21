@@ -22,6 +22,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   dynamic _focusId;
   String _search = '';
   bool _satellite = false;
+  bool _showNames = true;
   Map<String, dynamic>? _selected; // for the mini-card
   Timer? _refresh;
   final Map<String, String> _addrCache = {};
@@ -206,7 +207,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             setState(() => _selected = u);
             _map.move(pos, _map.camera.zoom < 13 ? 14 : _map.camera.zoom);
           },
-          child: _VehicleMarker(device: u, state: s, heading: heading, pulse: _pulseValue),
+          child: _VehicleMarker(device: u, state: s, heading: heading, pulse: _pulseValue, showName: _showNames),
         ),
       );
     }).toList();
@@ -254,8 +255,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 10, 16, 14),
             child: Column(children: [
               Row(children: [
-                Column(mainAxisSize: MainAxisSize.min, children: List.generate(3, (i) => Container(width: 22, height: 2.4, margin: const EdgeInsets.symmetric(vertical: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2))))),
-                const SizedBox(width: 13),
                 Container(width: 36, height: 36, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)), padding: const EdgeInsets.all(3), child: Image.asset('assets/logo-icon.png', errorBuilder: (_, __, ___) => const Icon(Icons.location_on, color: AppColors.teal, size: 22))),
                 const SizedBox(width: 9),
                 const Text('Bharat GPS Tracker', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
@@ -350,6 +349,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   const SizedBox(height: 12),
                   _mapCtrl(Icons.layers_outlined, () => setState(() => _satellite = !_satellite)),
                   const SizedBox(height: 12),
+                  // show/hide vehicle names
+                  _mapCtrl(_showNames ? Icons.label : Icons.label_off, () => setState(() => _showNames = !_showNames)),
+                  const SizedBox(height: 12),
                   Container(
                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: Color(0x1F0E5C5C), blurRadius: 8)]),
                     child: Column(children: [
@@ -382,7 +384,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Center(child: Container(width: 38, height: 4, margin: const EdgeInsets.only(bottom: 12), decoration: BoxDecoration(color: const Color(0xFFD8E0DE), borderRadius: BorderRadius.circular(3)))),
           Row(children: [
-            Container(width: 72, height: 58, decoration: BoxDecoration(color: const Color(0xFFEDF2F1), borderRadius: BorderRadius.circular(12)), child: Center(child: vehicleThumb(u['icon_url'], size: 60))),
+            vehicleBox(u['icon_url'], box: 60, bg: stateBg(s)),
             const SizedBox(width: 13),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
@@ -476,7 +478,8 @@ class _VehicleMarker extends StatelessWidget {
   final String state;
   final double heading;
   final double pulse; // 0..1 from parent ticker
-  const _VehicleMarker({required this.device, required this.state, required this.heading, required this.pulse});
+  final bool showName;
+  const _VehicleMarker({required this.device, required this.state, required this.heading, required this.pulse, this.showName = true});
 
   @override
   Widget build(BuildContext context) {
@@ -497,14 +500,15 @@ class _VehicleMarker extends StatelessWidget {
               decoration: BoxDecoration(color: AppColors.green.withOpacity((1 - pulse) * 0.35), shape: BoxShape.circle),
             ),
           // plate label above
-          Positioned(
-            top: 2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x2E000000), blurRadius: 8)]),
-              child: Text(u['name'] ?? 'Vehicle', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink)),
+          if (showName)
+            Positioned(
+              top: 2,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x2E000000), blurRadius: 8)]),
+                child: Text(u['name'] ?? 'Vehicle', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink)),
+              ),
             ),
-          ),
           // vehicle pic (rotated by heading)
           Transform.rotate(
             angle: heading * 3.14159265 / 180.0,
@@ -593,7 +597,7 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             Center(child: Container(width: 38, height: 5, margin: const EdgeInsets.only(bottom: 14), decoration: BoxDecoration(color: const Color(0xFFE2E9E8), borderRadius: BorderRadius.circular(3)))),
             // head with close
             Row(children: [
-              Container(width: 60, height: 60, decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(16)), child: Center(child: vehicleThumb(u['icon_url'], size: 48))),
+              vehicleBox(u['icon_url'], box: 60, bg: stateBg(s)),
               const SizedBox(width: 13),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
@@ -637,6 +641,10 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             _row(Icons.schedule, 'Last Update', agoText(u['time'])),
             const Divider(height: 1, color: AppColors.line),
             _row(Icons.wifi, 'GPS Signal', gps, valColor: gps == 'Strong' ? AppColors.green : AppColors.red),
+            if (_expiryText(u['expiry']) != null) ...[
+              const Divider(height: 1, color: AppColors.line),
+              _row(Icons.event, 'Device Expiry', _expiryText(u['expiry'])!, valColor: _expiryColor(u['expiry'])),
+            ],
             const SizedBox(height: 16),
             // actions: Live Track + Playback, then Reports full-width
             Row(children: [
@@ -714,6 +722,29 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
           ]),
         ),
       );
+
+  // expiry date + days to go, e.g. "2026-12-31 (188 days)"
+  String? _expiryText(dynamic exp) {
+    if (exp == null) return null;
+    final s = exp.toString();
+    if (s.isEmpty || s.startsWith('0000')) return null;
+    final d = DateTime.tryParse(s.replaceFirst(' ', 'T'));
+    if (d == null) return s;
+    final days = d.difference(DateTime.now()).inDays;
+    final dateStr = '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    if (days < 0) return '$dateStr (expired)';
+    return '$dateStr ($days day${days == 1 ? '' : 's'})';
+  }
+
+  Color _expiryColor(dynamic exp) {
+    final s = exp?.toString() ?? '';
+    final d = DateTime.tryParse(s.replaceFirst(' ', 'T'));
+    if (d == null) return AppColors.ink;
+    final days = d.difference(DateTime.now()).inDays;
+    if (days < 0) return AppColors.red;
+    if (days <= 15) return AppColors.orange;
+    return AppColors.green;
+  }
 
   Widget _row(IconData ic, String k, String v, {Color? valColor}) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 11),
