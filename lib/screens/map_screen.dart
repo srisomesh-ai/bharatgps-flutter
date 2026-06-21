@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -21,12 +22,22 @@ class _MapScreenState extends State<MapScreen> {
   String _search = '';
   bool _satellite = false;
   Map<String, dynamic>? _selected; // for the mini-card
+  Timer? _refresh;
+  final Map<String, String> _addrCache = {};
 
   @override
   void initState() {
     super.initState();
     _load();
     _loadGprs();
+    // live refresh every 5 seconds (like the web POLL_MS)
+    _refresh = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
+  }
+
+  @override
+  void dispose() {
+    _refresh?.cancel();
+    super.dispose();
   }
 
   @override
@@ -35,18 +46,45 @@ class _MapScreenState extends State<MapScreen> {
     _focusId ??= ModalRoute.of(context)?.settings.arguments;
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool silent = false}) async {
     final d = await ApiService.getDevices();
     if (!mounted) return;
+    // keep the selected vehicle's reference fresh
+    if (_selected != null) {
+      final match = d.firstWhere((e) => '${e['id']}' == '${_selected!['id']}', orElse: () => {});
+      if (match.isNotEmpty) _selected = match;
+    }
     setState(() {
       _devices = d;
       _loading = false;
     });
-    if (_focusId != null) {
+    _resolveAddresses(d);
+    if (!silent && _focusId != null) {
       final u = _devices.firstWhere((e) => '${e['id']}' == '$_focusId', orElse: () => {});
       if (u.isNotEmpty && u['lat'] != null) {
         _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 15);
         setState(() => _selected = u);
+      }
+    }
+  }
+
+  // reverse-geocode any device whose address is empty
+  Future<void> _resolveAddresses(List<Map<String, dynamic>> devs) async {
+    for (final u in devs) {
+      if ((u['address'] ?? '').toString().isNotEmpty) continue;
+      final key = '${u['id']}';
+      if (_addrCache.containsKey(key)) {
+        u['address'] = _addrCache[key];
+        continue;
+      }
+      if (u['lat'] == null || u['lng'] == null) continue;
+      final name = await ApiService.reverseGeocode(u['lat'], u['lng']);
+      if (name != null && mounted) {
+        _addrCache[key] = name;
+        setState(() {
+          u['address'] = name;
+          if (_selected != null && '${_selected!['id']}' == key) _selected!['address'] = name;
+        });
       }
     }
   }
