@@ -140,6 +140,7 @@ class NotificationService {
           'token': token,
           'sound': sound.id,
           'platform': 'android',
+          'email': ApiService.userEmail ?? '',
         }),
       ).timeout(const Duration(seconds: 15));
     } catch (_) {
