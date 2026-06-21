@@ -28,7 +28,11 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
     await NotificationService.init();
   } catch (_) {
-    // Firebase not configured yet — app still works, notifications inactive.
+    // Firebase not configured yet — app still works.
+    // Still set up local notifications + in-app alert polling so app alerts work.
+    try {
+      await NotificationService.initLocalOnly();
+    } catch (_) {}
   }
 
   runApp(const BharatGpsApp());
