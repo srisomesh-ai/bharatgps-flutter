@@ -64,6 +64,24 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
     });
   }
 
+  Future<void> _showDebug() async {
+    showDialog(context: context, builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.teal)));
+    final raw = await ApiService.getEventsRaw();
+    if (!mounted) return;
+    Navigator.pop(context);
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Server response', style: TextStyle(fontSize: 15)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(child: SelectableText(raw, style: const TextStyle(fontSize: 11, fontFamily: 'monospace'))),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ),
+    );
+  }
+
   static const _typeMeta = {
     'overspeed': {'name': 'Over Speed Alert', 'icon': Icons.speed, 'color': AppColors.red, 'bg': AppColors.redBg},
     'move_duration': {'name': 'Movement Alert', 'icon': Icons.trending_flat, 'color': AppColors.blue, 'bg': AppColors.blueBg},
@@ -207,12 +225,22 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
   Widget _historyTab() {
     if (_loadingEvents) return const Center(child: CircularProgressIndicator(color: AppColors.teal));
     if (_events.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.history, size: 50, color: AppColors.muted),
-          SizedBox(height: 12),
-          Text('No events yet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          Text('Triggered alerts from the last 7 days appear here.', style: TextStyle(fontSize: 12.5, color: AppColors.muted)),
+          const Icon(Icons.history, size: 50, color: AppColors.muted),
+          const SizedBox(height: 12),
+          const Text('No events yet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 40),
+            child: Text('Triggered alerts from the last 7 days appear here. An alert must actually fire (a vehicle does the thing) to create an event.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: AppColors.muted)),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: _showDebug,
+            icon: const Icon(Icons.bug_report_outlined, size: 16),
+            label: const Text('Check server response'),
+            style: OutlinedButton.styleFrom(foregroundColor: AppColors.teal, side: const BorderSide(color: AppColors.line)),
+          ),
         ]),
       );
     }
