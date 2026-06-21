@@ -117,13 +117,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       final id = '${u['id']}';
       final target = LatLng(_toD(u['lat']), _toD(u['lng']));
       final cur = _animPos[id] ?? target;
-      _srcPos[id] = cur;
+      // if the vehicle jumped a long way (teleport / first fix / big gap), snap instead of drawing a line across
+      final jump = (cur.latitude - target.latitude).abs() > 0.05 || (cur.longitude - target.longitude).abs() > 0.05;
+      _srcPos[id] = jump ? target : cur;
       _dstPos[id] = target;
-      _animPos[id] ??= target;
+      _animPos[id] = jump ? target : (_animPos[id] ?? target);
       _heading[id] = _toD(u['course']).toDouble();
-      // reset tail if vehicle is not moving
+      // reset tail if vehicle is not moving OR jumped
       final moving = stateOf(u['online'], u['speed']) == 'rn';
-      if (!moving) _tail[id] = [];
+      if (!moving || jump) _tail[id] = [];
     }
     _glideStartMs = DateTime.now().millisecondsSinceEpoch;
     setState(() {
@@ -209,8 +211,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       final heading = _heading[id] ?? _toD(u['course']).toDouble();
       return Marker(
         point: pos,
-        width: 90,
-        height: 90,
+        width: 200,
+        height: 96,
         child: GestureDetector(
           onTap: () {
             setState(() => _selected = u);
@@ -361,6 +363,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   // show/hide vehicle names
                   _mapCtrl(_showNames ? Icons.label : Icons.label_off, () => setState(() => _showNames = !_showNames)),
                   const SizedBox(height: 12),
+                  // reset to north (compass)
+                  _mapCtrl(Icons.explore, () {
+                    _map.rotate(0);
+                    setState(() {});
+                  }),
+                  const SizedBox(height: 12),
                   Container(
                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: Color(0x1F0E5C5C), blurRadius: 8)]),
                     child: Column(children: [
@@ -496,40 +504,55 @@ class _VehicleMarker extends StatelessWidget {
     final u = device;
     final tagText = s == 'rn' ? '${u['speed'] ?? 0} km/h' : stateLabels[s]!;
     return SizedBox(
-      width: 90,
-      height: 90,
+      width: 200,
+      height: 96,
       child: Stack(
         alignment: Alignment.center,
+        clipBehavior: Clip.none,
         children: [
           // live pulse (only running)
           if (s == 'rn')
-            Container(
-              width: 34 * (0.5 + pulse * 1.7),
-              height: 34 * (0.5 + pulse * 1.7),
-              decoration: BoxDecoration(color: AppColors.green.withOpacity((1 - pulse) * 0.35), shape: BoxShape.circle),
-            ),
-          // plate label above
-          if (showName)
             Positioned(
-              top: 2,
+              top: 32,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x2E000000), blurRadius: 8)]),
-                child: Text(u['name'] ?? 'Vehicle', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                width: 34 * (0.5 + pulse * 1.7),
+                height: 34 * (0.5 + pulse * 1.7),
+                decoration: BoxDecoration(color: AppColors.green.withOpacity((1 - pulse) * 0.35), shape: BoxShape.circle),
               ),
             ),
-          // vehicle pic (rotated by heading)
-          Transform.rotate(
-            angle: heading * 3.14159265 / 180.0,
-            child: SizedBox(width: 46, height: 46, child: vehicleThumb(u['icon_url'], size: 46)),
+          // plate label above (centered, full width available so it never clips)
+          if (showName)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x2E000000), blurRadius: 8)]),
+                  child: Text(u['name'] ?? 'Vehicle', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                ),
+              ),
+            ),
+          // vehicle pic (rotated by heading) — centered
+          Positioned(
+            top: 28,
+            child: Transform.rotate(
+              angle: heading * 3.14159265 / 180.0,
+              child: SizedBox(width: 46, height: 46, child: vehicleThumb(u['icon_url'], size: 46)),
+            ),
           ),
           // status tag below
           Positioned(
-            bottom: 8,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
-              decoration: BoxDecoration(color: stateColor(s), borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6)]),
-              child: Text(tagText, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+            bottom: 4,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+                decoration: BoxDecoration(color: stateColor(s), borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6)]),
+                child: Text(tagText, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+              ),
             ),
           ),
         ],
