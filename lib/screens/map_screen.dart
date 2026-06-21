@@ -37,6 +37,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Ticker? _ticker;
   int _glideStartMs = 0;
   double _pulseValue = 0; // 0..1 pulse phase for running markers
+  int _lastDrop = 0; // last breadcrumb drop time (ms)
   static const _glideMs = 5000;   // matches web GLIDE_MS / POLL_MS
   static const _maxTail = 40;
 
@@ -60,6 +61,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
     final now = DateTime.now().millisecondsSinceEpoch;
     final k = ((now - _glideStartMs) / _glideMs).clamp(0.0, 1.0);
+    final dropNow = (now - _lastDrop) >= 180; // web DROP_EVERY = 180ms
     for (final id in _dstPos.keys) {
       final src = _srcPos[id], dst = _dstPos[id];
       if (src == null || dst == null) continue;
@@ -67,29 +69,26 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       final lng = src.longitude + (dst.longitude - src.longitude) * k;
       final np = LatLng(lat, lng);
       _animPos[id] = np;
-      // drop tail points while gliding (only for moving vehicles)
+      // drop tail breadcrumbs while gliding (only for moving vehicles)
       final dev = _devices.firstWhere((e) => '${e['id']}' == id, orElse: () => {});
       final moving = dev.isNotEmpty && stateOf(dev['online'], dev['speed']) == 'rn';
-      if (moving) {
+      if (moving && dropNow) {
         final t = _tail.putIfAbsent(id, () => []);
-        if (t.isEmpty || _dist(t.last, np) > 0.00002) {
+        if (t.isEmpty || t.last != np) {
           t.add(np);
           if (t.length > _maxTail) t.removeAt(0);
         }
-        // follow selected vehicle
-        if (_selected != null && '${_selected!['id']}' == id) {
-          _map.move(np, _map.camera.zoom);
-        }
+      }
+      // follow selected vehicle
+      if (moving && _selected != null && '${_selected!['id']}' == id) {
+        _map.move(np, _map.camera.zoom);
       }
     }
+    if (dropNow) _lastDrop = now;
     // rebuild every frame so glide + pulse animate smoothly
     if (mounted) setState(() {});
   }
 
-  double _dist(LatLng a, LatLng b) {
-    final dx = a.latitude - b.latitude, dy = a.longitude - b.longitude;
-    return dx * dx + dy * dy;
-  }
 
   @override
   void dispose() {
@@ -169,7 +168,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   double _toD(dynamic v) => double.tryParse('$v') ?? 0;
 
-  // tail trail from the server's `tail` array (always available), fading teal
+  // tail trail = breadcrumbs dropped as the vehicle glides (the path already
+  // travelled). Only shows BEHIND the vehicle, never a line to the next point.
   List<Polyline> _tailPolylines() {
     final out = <Polyline>[];
     final visible = _devices.where((u) {
@@ -177,19 +177,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       return (u['name'] ?? '').toString().toLowerCase().contains(_search);
     });
     for (final u in visible) {
-      final tail = (u['tail'] as List?) ?? [];
-      if (tail.length < 2) continue;
-      final pts = tail.map((p) => LatLng((p['lat'] as num).toDouble(), (p['lng'] as num).toDouble())).toList();
-      // add the current animated/live position as the final tail point
       final id = '${u['id']}';
+      final coords = _tail[id] ?? [];
       final live = _animPos[id];
-      if (live != null) pts.add(live);
+      final pts = <LatLng>[...coords];
+      if (live != null) pts.add(live); // trail ends exactly at the vehicle
+      if (pts.length < 2) continue;
       final n = pts.length;
       for (int i = 1; i < n; i++) {
         final frac = i / (n - 1);
         out.add(Polyline(
           points: [pts[i - 1], pts[i]],
-          color: AppColors.teal.withOpacity((0.12 + frac * 0.55).clamp(0.0, 1.0)),
+          color: AppColors.teal.withOpacity((0.10 + frac * 0.6).clamp(0.0, 1.0)),
           strokeWidth: 2 + frac * 3,
         ));
       }
