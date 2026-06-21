@@ -87,7 +87,14 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                           Expanded(child: Text(s.label, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600))),
                           // preview button
                           GestureDetector(
-                            onTap: () => NotificationService.preview(s),
+                            onTap: () async {
+                              await NotificationService.preview(s);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Playing "${s.label}" — check your notification shade'), duration: const Duration(seconds: 2)),
+                                );
+                              }
+                            },
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                               decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(20)),
