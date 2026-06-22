@@ -437,6 +437,23 @@ class ApiService {
     return null;
   }
 
+  /// Fetch the alert types the server actually supports (definitive source).
+  /// Returns a list of {type, title, options...}.
+  static Future<List<Map<String, dynamic>>> getAlertAttributes() async {
+    try {
+      final res = await http.get(_u(host!, 'get_alerts_attributes', {
+        'lang': 'en',
+        'user_api_hash': hash!,
+      })).timeout(const Duration(seconds: 20));
+      if (res.statusCode != 200) return [];
+      final j = jsonDecode(res.body);
+      final types = (j is Map && j['types'] is List) ? j['types'] : [];
+      return List<Map<String, dynamic>>.from(types.map((e) => Map<String, dynamic>.from(e as Map)));
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// ENGINE CUT-OFF — list of devices that accept GPRS commands.
   static Future<List<String>> getCommandDevices() async {
     final res = await http.get(_u(host!, 'send_command_data', {
@@ -523,15 +540,40 @@ class ApiService {
     int? moveDuration,
     int? ignitionDuration,
   }) async {
-    final payload = {
+    // map our friendly types to the GPSWOX server type + extra params
+    String serverType = type;
+    final extra = <String, dynamic>{};
+    switch (type) {
+      case 'engine_on':
+        serverType = 'ignition'; // ignition event
+        extra['ignition'] = 'on';
+        break;
+      case 'engine_off':
+        serverType = 'ignition';
+        extra['ignition'] = 'off';
+        break;
+      case 'offline':
+        serverType = 'device_offline'; // device stopped reporting
+        extra['offline_duration'] = moveDuration ?? 10; // minutes offline before alerting
+        break;
+      case 'powercut':
+        serverType = 'power_cut';
+        break;
+      case 'lowbattery':
+        serverType = 'low_battery';
+        break;
+    }
+
+    final payload = <String, dynamic>{
       'active': 1,
-      'type': type,
+      'type': serverType,
       'name': name,
       'devices': devices,
       'notifications': {
         'push': {'active': 1},
         'popup': {'active': 1, 'input': 0},
       },
+      ...extra,
     };
     if (type == 'overspeed') payload['overspeed'] = overspeed ?? 60;
     if (type == 'move_duration') payload['move_duration'] = moveDuration ?? 1;
