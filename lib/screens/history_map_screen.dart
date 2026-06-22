@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -53,9 +54,14 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
       _loading = false;
     });
     if (_points.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final bounds = LatLngBounds.fromPoints(_points.map((p) => LatLng(p['lat'], p['lng'])).toList());
-        _map.fitCamera(CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50)));
+      // small delay lets the map controller attach so tiles load at the right
+      // zoom immediately (fixes the blurry map that only sharpens after a tap)
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (!mounted) return;
+        try {
+          final bounds = LatLngBounds.fromPoints(_points.map((p) => LatLng(p['lat'], p['lng'])).toList());
+          _map.fitCamera(CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50)));
+        } catch (_) {}
       });
     }
   }
@@ -138,7 +144,7 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
                       width: 80, height: 56,
                       child: _labeledPin('END', AppColors.red, Icons.stop),
                     ),
-                  // MOVING marker = the vehicle's own icon
+                  // MOVING marker = the vehicle's own icon, rotated to heading
                   if (cur != null)
                     Marker(
                       point: LatLng(cur['lat'], cur['lng']),
@@ -146,7 +152,10 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
                       child: Container(
                         decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white, border: Border.all(color: AppColors.teal, width: 2.5), boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 6)]),
                         padding: const EdgeInsets.all(3),
-                        child: ClipOval(child: vehicleThumb(widget.device['icon_url'], size: 40)),
+                        child: Transform.rotate(
+                          angle: _headingAt(_idx) * 3.14159265 / 180.0,
+                          child: ClipOval(child: vehicleThumb(widget.device['icon_url'], size: 40)),
+                        ),
                       ),
                     ),
                 ]),
@@ -213,6 +222,30 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
           ),
       ]),
     );
+  }
+
+  // heading for the marker at index i: use course if present, else bearing to next point
+  double _headingAt(int i) {
+    if (_points.isEmpty) return 0;
+    final c = (_points[i]['course'] is num) ? (_points[i]['course'] as num).toDouble() : 0.0;
+    if (c != 0) return c;
+    // bearing from this point to the next one
+    final j = (i + 1 < _points.length) ? i + 1 : i;
+    if (j == i && i > 0) {
+      // last point: use bearing from previous
+      return _bearing(_points[i - 1], _points[i]);
+    }
+    return _bearing(_points[i], _points[j]);
+  }
+
+  double _bearing(Map a, Map b) {
+    final lat1 = (a['lat'] as num).toDouble() * 3.14159265 / 180;
+    final lat2 = (b['lat'] as num).toDouble() * 3.14159265 / 180;
+    final dLon = ((b['lng'] as num).toDouble() - (a['lng'] as num).toDouble()) * 3.14159265 / 180;
+    final y = math.sin(dLon) * math.cos(lat2);
+    final x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
+    final brng = math.atan2(y, x) * 180 / 3.14159265;
+    return (brng + 360) % 360;
   }
 
   Widget _labeledPin(String label, Color color, IconData ic) {
