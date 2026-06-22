@@ -32,6 +32,30 @@ class NotificationService {
   static String? _fcmToken;
   static const _prefKey = 'bgps_alert_sound';
 
+  /// Alert types that can each have their own sound.
+  static const alertTypes = <String, String>{
+    'overspeed': 'Over Speed',
+    'move_duration': 'Movement',
+    'ignition_duration': 'Engine On/Off',
+    'powercut': 'GPS Power Cut',
+    'lowbattery': 'Low Battery',
+  };
+
+  /// Per-type sound: the sound chosen for a specific alert type.
+  /// Falls back to the global sound if the user hasn't set one for that type.
+  static Future<AlertSound> soundForType(String type) async {
+    final p = await SharedPreferences.getInstance();
+    final id = p.getString('bgps_sound_$type') ?? p.getString(_prefKey) ?? 'default';
+    return kAlertSounds.firstWhere((s) => s.id == id, orElse: () => kAlertSounds.first);
+  }
+
+  static Future<void> setSoundForType(String type, String soundId) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString('bgps_sound_$type', soundId);
+    final s = kAlertSounds.firstWhere((e) => e.id == soundId, orElse: () => kAlertSounds.first);
+    await _ensureChannel(s);
+  }
+
   /// The sound the user picked (defaults to 'default').
   static Future<AlertSound> currentSound() async {
     final p = await SharedPreferences.getInstance();
@@ -189,7 +213,7 @@ class NotificationService {
           final t = DateTime.tryParse('${e['time']}'.replaceFirst(' ', 'T'));
           if (t != null && t.isAfter(cutoff)) {
             final msg = (e['message'] ?? 'Vehicle alert').toString();
-            await _showLocal(msg, (e['address'] ?? '').toString());
+            await _showLocal(msg, (e['address'] ?? '').toString(), type: _guessAlertType(msg));
           }
         }
         _primed = true;
@@ -200,13 +224,25 @@ class NotificationService {
         if (_seenEvents.contains(id)) continue;
         _seenEvents.add(id);
         final msg = (e['message'] ?? 'Vehicle alert').toString();
-        await _showLocal(msg, (e['address'] ?? '').toString());
+        await _showLocal(msg, (e['address'] ?? '').toString(), type: _guessAlertType(msg));
       }
     } catch (_) {}
   }
 
-  static Future<void> _showLocal(String title, String body) async {
-    final sound = await currentSound();
+  // map an event message to an alert type so the right per-type sound plays
+  static String? _guessAlertType(String msg) {
+    final m = msg.toLowerCase();
+    if (m.contains('speed')) return 'overspeed';
+    if (m.contains('move') || m.contains('motion')) return 'move_duration';
+    if (m.contains('ignition') || m.contains('engine')) return 'ignition_duration';
+    if (m.contains('power') || m.contains('unplug')) return 'powercut';
+    if (m.contains('battery')) return 'lowbattery';
+    return null;
+  }
+
+  static Future<void> _showLocal(String title, String body, {String? type}) async {
+    // pick the sound chosen for this alert type (falls back to global, then default)
+    final sound = type != null ? await soundForType(type) : await currentSound();
     final details = AndroidNotificationDetails(
       'bgps_alerts_${sound.id}',
       'Alerts — ${sound.label}',
