@@ -86,9 +86,11 @@ jobs:
               s=re.sub(r'(<manifest[^>]*>)', r'\1\n    <uses-permission android:name="android.permission.INTERNET"/>', s, count=1)
           if 'POST_NOTIFICATIONS' not in s:
               s=re.sub(r'(<manifest[^>]*>)', r'\1\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>', s, count=1)
-          # allow launching maps/geo intents (Android 11+ visibility)
+          if 'android.permission.VIBRATE' not in s:
+              s=re.sub(r'(<manifest[^>]*>)', r'\1\n    <uses-permission android:name="android.permission.VIBRATE"/>', s, count=1)
+          # allow launching maps/geo intents + WhatsApp (Android 11+ visibility)
           if '<queries>' not in s:
-              q='<queries><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="geo"/></intent><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent></queries>'
+              q='<queries><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="geo"/></intent><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="market"/></intent><package android:name="com.whatsapp"/><package android:name="com.whatsapp.w4b"/></queries>'
               s=re.sub(r'(<manifest[^>]*>)', r'\1\n    '+q, s, count=1)
           s=re.sub(r'android:label="[^"]*"', 'android:label="Bharat GPS Tracker"', s, count=1)
           if 'usesCleartextTraffic' not in s:
