@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../widgets/loaders.dart';
 import '../widgets/bottom_nav.dart';
 
 class HistoryMapScreen extends StatefulWidget {
@@ -168,7 +169,11 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
                 _stat('${_stops.length}', 'STOPS'),
               ]),
             ),
-            if (_loading) const Center(child: CircularProgressIndicator(color: AppColors.teal)),
+            if (_loading)
+              Container(
+                color: Colors.white.withOpacity(0.82),
+                child: const Center(child: RouteLoader(label: 'Loading route…')),
+              ),
             if (!_loading && _points.isEmpty)
               const Center(child: Text('No route data for this period', style: TextStyle(color: AppColors.ink2))),
           ]),
