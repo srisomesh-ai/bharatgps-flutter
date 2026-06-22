@@ -1,4 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+/// App-wide haptic feedback helpers. Use these on taps so the app feels tactile.
+class Haptics {
+  /// Light tap — for nav switches, list taps, chip selections.
+  static void light() => HapticFeedback.lightImpact();
+
+  /// Medium tap — for primary action buttons (Navigate, Playback, Create).
+  static void medium() => HapticFeedback.mediumImpact();
+
+  /// Heavy/selection — for important confirms (Engine cut-off, delete).
+  static void heavy() => HapticFeedback.heavyImpact();
+
+  /// Selection click — subtle, for toggles and radio choices.
+  static void select() => HapticFeedback.selectionClick();
+}
 
 class AppColors {
   static const teal = Color(0xFF0E5C5C);
