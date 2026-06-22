@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../widgets/bottom_nav.dart';
 
 class HistoryMapScreen extends StatefulWidget {
   final Map<String, dynamic> device;
@@ -117,18 +118,35 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
                     Polyline(points: _points.map((p) => LatLng(p['lat'], p['lng'])).toList(), color: AppColors.teal, strokeWidth: 4),
                   ]),
                 MarkerLayer(markers: [
+                  // START (green) with label
                   if (_points.isNotEmpty)
-                    Marker(point: LatLng(_points.first['lat'], _points.first['lng']), width: 16, height: 16, child: Container(decoration: BoxDecoration(color: AppColors.green, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)))),
-                  if (_points.isNotEmpty)
-                    Marker(point: LatLng(_points.last['lat'], _points.last['lng']), width: 16, height: 16, child: Container(decoration: BoxDecoration(color: AppColors.red, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)))),
-                  ..._stops.map((s) => Marker(point: LatLng(s['lat'], s['lng']), width: 14, height: 14, child: Container(decoration: BoxDecoration(color: AppColors.orange, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2))))),
+                    Marker(
+                      point: LatLng(_points.first['lat'], _points.first['lng']),
+                      width: 80, height: 56,
+                      child: _labeledPin('START', AppColors.green, Icons.flag),
+                    ),
+                  // STOPS (orange) with duration label
+                  ..._stops.map((s) => Marker(
+                        point: LatLng(s['lat'], s['lng']),
+                        width: 90, height: 50,
+                        child: _labeledPin('${s['mins'] ?? ''}m stop', AppColors.orange, Icons.pause),
+                      )),
+                  // END (red) with label
+                  if (_points.length > 1)
+                    Marker(
+                      point: LatLng(_points.last['lat'], _points.last['lng']),
+                      width: 80, height: 56,
+                      child: _labeledPin('END', AppColors.red, Icons.stop),
+                    ),
+                  // MOVING marker = the vehicle's own icon
                   if (cur != null)
                     Marker(
                       point: LatLng(cur['lat'], cur['lng']),
-                      width: 28, height: 28,
+                      width: 50, height: 50,
                       child: Container(
-                        decoration: BoxDecoration(color: AppColors.teal, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3), boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 6)]),
-                        child: const Icon(Icons.local_shipping, color: Colors.white, size: 14),
+                        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white, border: Border.all(color: AppColors.teal, width: 2.5), boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 6)]),
+                        padding: const EdgeInsets.all(3),
+                        child: ClipOval(child: vehicleThumb(widget.device['icon_url'], size: 40)),
                       ),
                     ),
                 ]),
@@ -195,6 +213,22 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
           ),
       ]),
     );
+  }
+
+  Widget _labeledPin(String label, Color color, IconData ic) {
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(7), boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)]),
+        child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
+      ),
+      Container(
+        margin: const EdgeInsets.only(top: 2),
+        width: 22, height: 22,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2.5), boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 4)]),
+        child: Icon(ic, color: Colors.white, size: 12),
+      ),
+    ]);
   }
 
   Widget _stat(String v, String l) => Expanded(
