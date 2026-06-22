@@ -264,7 +264,7 @@ class ApiService {
         final t1 = DateTime.tryParse(points[j - 1]['t'].toString().replaceFirst(' ', 'T'));
         if (t0 != null && t1 != null) {
           final secs = t1.difference(t0).inSeconds;
-          if (secs >= 120) {
+          if (secs >= 90) {
             stops.add({
               'lat': points[i]['lat'], 'lng': points[i]['lng'],
               'mins': (secs / 60).round(),
@@ -283,7 +283,7 @@ class ApiService {
           final t1 = DateTime.tryParse(points[i + 1]['t'].toString().replaceFirst(' ', 'T'));
           if (t0 != null && t1 != null) {
             final gap = t1.difference(t0).inSeconds;
-            if (gap >= 600) {
+            if (gap >= 300) {
               stops.add({
                 'lat': points[i]['lat'], 'lng': points[i]['lng'],
                 'mins': (gap / 60).round(),
@@ -456,22 +456,56 @@ class ApiService {
       if (res.statusCode != 200) return null;
       final j = jsonDecode(res.body);
       if (j is! Map) return null;
-      // the device record is usually under 'item'
-      final item = (j['item'] is Map) ? Map<String, dynamic>.from(j['item']) : j;
-      final candidates = [
+
+      // 1) try the obvious spots first
+      final item = (j['item'] is Map) ? Map<String, dynamic>.from(j['item']) : <String, dynamic>{};
+      final direct = [
         item['expiration_date'],
         j['expiration_date'],
+        item['sim_expiration_date'],
         item['expires_date'],
-        item['subscription_expiration'],
       ];
-      for (final c in candidates) {
-        if (c == null) continue;
-        final s = c.toString().trim();
-        if (s.isNotEmpty && !s.startsWith('0000') && s != 'null' && RegExp(r'\d{4}-\d{2}-\d{2}').hasMatch(s)) {
-          return s;
+      for (final c in direct) {
+        final v = _validExpiry(c);
+        if (v != null) return v;
+      }
+
+      // 2) deep-scan the whole response for any "expir" key with a real date
+      final found = _deepFindExpiry(j);
+      if (found != null) return found;
+    } catch (_) {}
+    return null;
+  }
+
+  // recursively look for any key containing "expir" that holds a valid date
+  static String? _deepFindExpiry(dynamic node) {
+    if (node is Map) {
+      for (final entry in node.entries) {
+        final k = entry.key.toString().toLowerCase();
+        if (k.contains('expir')) {
+          final v = _validExpiry(entry.value);
+          if (v != null) return v;
         }
       }
-    } catch (_) {}
+      // recurse
+      for (final v in node.values) {
+        final r = _deepFindExpiry(v);
+        if (r != null) return r;
+      }
+    } else if (node is List) {
+      for (final v in node) {
+        final r = _deepFindExpiry(v);
+        if (r != null) return r;
+      }
+    }
+    return null;
+  }
+
+  static String? _validExpiry(dynamic c) {
+    if (c == null) return null;
+    final s = c.toString().trim();
+    if (s.isEmpty || s == 'null' || s.startsWith('0000')) return null;
+    if (RegExp(r'\d{4}-\d{2}-\d{2}').hasMatch(s)) return s;
     return null;
   }
 
