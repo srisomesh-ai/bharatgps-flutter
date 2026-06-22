@@ -127,7 +127,13 @@ class ApiService {
       'plate': dd['plate_number'] ?? d['plate'] ?? '',
       'icon_url': _iconUrl(d),
       'total_distance': d['total_distance'],
-      'expiry': _firstValidDate([dd['expiration_date'], d['expiration_date'], d['sim_expiration_date'], dd['sim_expiration_date']]),
+      'expiry': _firstValidDate([
+        dd['expiration_date'], d['expiration_date'],
+        dd['expires_date'], d['expires_date'],
+        dd['expires'], d['expires'],
+        dd['subscription_expiration'], d['subscription_expiration'],
+        dd['sim_expiration_date'], d['sim_expiration_date'],
+      ]) ?? _scanExpiry(dd) ?? _scanExpiry(d),
       'tail': (d['tail'] is List)
           ? (d['tail'] as List)
               .where((p) => p is Map && p['lat'] != null && p['lng'] != null)
@@ -154,6 +160,20 @@ class ApiService {
       final s = c.toString().trim();
       if (s.isEmpty || s.startsWith('0000') || s == 'null') continue;
       return s;
+    }
+    return null;
+  }
+
+  // fallback: scan any map for a key containing 'expir'/'expire' with a real date value
+  static String? _scanExpiry(Map m) {
+    for (final entry in m.entries) {
+      final k = entry.key.toString().toLowerCase();
+      if (k.contains('expir') || k.contains('expire')) {
+        final s = '${entry.value}'.trim();
+        if (s.isNotEmpty && !s.startsWith('0000') && s != 'null' && RegExp(r'\d{4}-\d{2}-\d{2}').hasMatch(s)) {
+          return s;
+        }
+      }
     }
     return null;
   }
