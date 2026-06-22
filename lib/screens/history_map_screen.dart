@@ -144,18 +144,14 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
                       width: 80, height: 56,
                       child: _labeledPin('END', AppColors.red, Icons.stop),
                     ),
-                  // MOVING marker = the vehicle's own icon, rotated to heading
+                  // MOVING marker = the vehicle's own icon (transparent PNG, rotated to heading)
                   if (cur != null)
                     Marker(
                       point: LatLng(cur['lat'], cur['lng']),
-                      width: 50, height: 50,
-                      child: Container(
-                        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white, border: Border.all(color: AppColors.teal, width: 2.5), boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 6)]),
-                        padding: const EdgeInsets.all(3),
-                        child: Transform.rotate(
-                          angle: _headingAt(_idx) * 3.14159265 / 180.0,
-                          child: ClipOval(child: vehicleThumb(widget.device['icon_url'], size: 40)),
-                        ),
+                      width: 54, height: 54,
+                      child: Transform.rotate(
+                        angle: _headingAt(_idx) * 3.14159265 / 180.0,
+                        child: vehicleThumb(widget.device['icon_url'], size: 48),
                       ),
                     ),
                 ]),
