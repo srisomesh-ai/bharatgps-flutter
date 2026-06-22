@@ -674,12 +674,28 @@ class _VehicleDetailSheet extends StatefulWidget {
 class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
   late bool _isCut;
   bool _sending = false;
+  String? _fetchedExpiry; // expiry pulled from edit_device_data when get_devices had none
+  bool _loadingExpiry = false;
 
   @override
   void initState() {
     super.initState();
     final ts = widget.device['ts'] ?? {};
     _isCut = '${ts['blocked']}'.toLowerCase() == 'true';
+    // if the live device data has no expiry, fetch it from the edit endpoint
+    if ((widget.device['expiry'] == null || widget.device['expiry'].toString().isEmpty)) {
+      _loadExpiry();
+    }
+  }
+
+  Future<void> _loadExpiry() async {
+    setState(() => _loadingExpiry = true);
+    final exp = await ApiService.fetchDeviceExpiry('${widget.device['id']}');
+    if (!mounted) return;
+    setState(() {
+      _fetchedExpiry = exp;
+      _loadingExpiry = false;
+    });
   }
 
   Future<void> _navigateTo(Map<String, dynamic> u) async {
@@ -800,7 +816,11 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             const Divider(height: 1, color: AppColors.line),
             _row(Icons.wifi, 'GPS Signal', gps, valColor: gps == 'Strong' ? AppColors.green : AppColors.red),
             const Divider(height: 1, color: AppColors.line),
-            _row(Icons.event, 'Device Expiry', _expiryText(u['expiry']) ?? 'Not set', valColor: _expiryColor(u['expiry'])),
+            _row(Icons.event, 'Device Expiry',
+                _loadingExpiry
+                    ? 'Checking…'
+                    : (_expiryText(u['expiry'] ?? _fetchedExpiry) ?? 'Not set'),
+                valColor: _expiryColor(u['expiry'] ?? _fetchedExpiry)),
             const SizedBox(height: 16),
             // actions: Live Track + Playback, then Reports full-width
             Row(children: [
