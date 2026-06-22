@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
@@ -357,39 +358,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ),
             ]),
           ),
-          // ===== count (vehicle list) + map type =====
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(children: [
-                // vehicle list dropdown (select a vehicle to focus)
-                GestureDetector(
-                  onTap: _showVehicleList,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 6)]),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.people_alt_outlined, size: 16, color: AppColors.teal),
-                      const SizedBox(width: 6),
-                      Text('${visible.length}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                      const Icon(Icons.keyboard_arrow_down, size: 17, color: AppColors.ink2),
-                    ]),
-                  ),
-                ),
-                const Spacer(),
-                // map type toggle (Map / Google / Sat / Hybrid)
-                Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 6)]),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    _segBtn('Map', _mapType == 'normal', () => setState(() => _mapType = 'normal')),
-                    _segBtn('Google', _mapType == 'google', () => setState(() => _mapType = 'google')),
-                    _segBtn('Sat', _mapType == 'satellite', () => setState(() => _mapType = 'satellite')),
-                    _segBtn('Hybrid', _mapType == 'hybrid', () => setState(() => _mapType = 'hybrid')),
-                  ]),
-                ),
-            ]),
-          ),
-          // ===== MAP =====
+          // ===== MAP (fills everything below header; controls float on top) =====
           Expanded(
             child: Stack(children: [
               FlutterMap(
@@ -415,9 +384,39 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   color: AppColors.bg,
                   child: const SatelliteLoader(label: 'Locating vehicles…'),
                 ),
+              // floating vehicle count + map type (on top of the map)
+              Positioned(
+                left: 14, right: 14, top: 12,
+                child: Row(children: [
+                  GestureDetector(
+                    onTap: _showVehicleList,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 8)]),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.people_alt_outlined, size: 16, color: AppColors.teal),
+                        const SizedBox(width: 6),
+                        Text('${visible.length}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                        const Icon(Icons.keyboard_arrow_down, size: 17, color: AppColors.ink2),
+                      ]),
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 8)]),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      _segBtn('Map', _mapType == 'normal', () => setState(() => _mapType = 'normal')),
+                      _segBtn('Google', _mapType == 'google', () => setState(() => _mapType = 'google')),
+                      _segBtn('Sat', _mapType == 'satellite', () => setState(() => _mapType = 'satellite')),
+                      _segBtn('Hybrid', _mapType == 'hybrid', () => setState(() => _mapType = 'hybrid')),
+                    ]),
+                  ),
+                ]),
+              ),
               // floating controls
               Positioned(
-                right: 14, top: 16,
+                right: 14, top: 70,
                 child: Column(children: [
                   _mapCtrl(Icons.my_location, () {
                     if (_devices.isNotEmpty && _devices.first['lat'] != null) {
@@ -650,6 +649,21 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
     _isCut = '${ts['blocked']}'.toLowerCase() == 'true';
   }
 
+  Future<void> _navigateTo(Map<String, dynamic> u) async {
+    final lat = u['lat'], lng = u['lng'];
+    if (lat == null || lng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No location available for this vehicle')));
+      return;
+    }
+    // Google Maps directions to the vehicle's current location
+    final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Google Maps')));
+    }
+  }
+
   Future<void> _confirmCutoff() async {
     final cut = !_isCut;
     final ok = await showDialog<bool>(
@@ -769,6 +783,17 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
                 style: OutlinedButton.styleFrom(foregroundColor: AppColors.ink2, side: const BorderSide(color: AppColors.line), padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
               )),
             ]),
+            const SizedBox(height: 10),
+            // Navigate to vehicle via Google Maps
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _navigateTo(u),
+                icon: const Icon(Icons.directions, size: 18),
+                label: const Text('Navigate (Google Maps)'),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.blue, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
+              ),
+            ),
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
