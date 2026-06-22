@@ -202,8 +202,11 @@ class ApiService {
       toDt = to;
     } else {
       final d = (days ?? 1);
-      toDt = DateTime.now();
-      fromDt = DateTime(toDt.year, toDt.month, toDt.day);
+      final now = DateTime.now();
+      // end the window at end of today so the very latest points are always
+      // included (avoids missing recent data due to small device/server clock gaps)
+      toDt = DateTime(now.year, now.month, now.day, 23, 59, 59);
+      fromDt = DateTime(now.year, now.month, now.day);
       if (d > 1) fromDt = fromDt.subtract(Duration(days: d - 1));
     }
     String dd(DateTime t) => '${t.year.toString().padLeft(4, '0')}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
@@ -251,9 +254,10 @@ class ApiService {
     final stops = <Map<String, dynamic>>[];
     int i = 0;
     while (i < points.length) {
-      if ((points[i]['spd'] as int) <= 2) {
+      // a "stop" = speed at or below 3 km/h (stopped or idling)
+      if ((points[i]['spd'] as int) <= 3) {
         int j = i;
-        while (j < points.length && (points[j]['spd'] as int) <= 2) {
+        while (j < points.length && (points[j]['spd'] as int) <= 3) {
           j++;
         }
         final t0 = DateTime.tryParse(points[i]['t'].toString().replaceFirst(' ', 'T'));
@@ -266,6 +270,18 @@ class ApiService {
         }
         i = j;
       } else {
+        // also detect a stop when the device went silent (big time gap between
+        // consecutive moving points usually means it was parked/off)
+        if (i + 1 < points.length) {
+          final t0 = DateTime.tryParse(points[i]['t'].toString().replaceFirst(' ', 'T'));
+          final t1 = DateTime.tryParse(points[i + 1]['t'].toString().replaceFirst(' ', 'T'));
+          if (t0 != null && t1 != null) {
+            final gap = t1.difference(t0).inSeconds;
+            if (gap >= 600) {
+              stops.add({'lat': points[i]['lat'], 'lng': points[i]['lng'], 'mins': (gap / 60).round()});
+            }
+          }
+        }
         i++;
       }
     }
