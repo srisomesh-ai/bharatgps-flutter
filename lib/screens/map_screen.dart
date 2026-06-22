@@ -750,10 +750,8 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             _row(Icons.schedule, 'Last Update', agoText(u['time'])),
             const Divider(height: 1, color: AppColors.line),
             _row(Icons.wifi, 'GPS Signal', gps, valColor: gps == 'Strong' ? AppColors.green : AppColors.red),
-            if (_expiryText(u['expiry']) != null) ...[
-              const Divider(height: 1, color: AppColors.line),
-              _row(Icons.event, 'Device Expiry', _expiryText(u['expiry'])!, valColor: _expiryColor(u['expiry'])),
-            ],
+            const Divider(height: 1, color: AppColors.line),
+            _row(Icons.event, 'Device Expiry', _expiryText(u['expiry']) ?? 'Not set', valColor: _expiryColor(u['expiry'])),
             const SizedBox(height: 16),
             // actions: Live Track + Playback, then Reports full-width
             Row(children: [
