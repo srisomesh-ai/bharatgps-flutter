@@ -775,9 +775,24 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             const Divider(height: 1, color: AppColors.line),
             _row(Icons.wifi, 'GPS Signal', gps, valColor: gps == 'Strong' ? AppColors.green : AppColors.red),
             const Divider(height: 1, color: AppColors.line),
-            _row(Icons.event, 'Device Expiry', _expiryText(u['expiry']) ?? 'Not set', valColor: _expiryColor(u['expiry'])),
-            if (_expiryText(u['expiry']) == null && (u['expiry_raw'] ?? '').toString().isNotEmpty)
-              Padding(padding: const EdgeInsets.only(bottom: 6), child: Text('raw: ${u['expiry_raw']}', style: const TextStyle(fontSize: 9, color: AppColors.muted))),
+            GestureDetector(
+              onTap: () => showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text('Expiry debug', style: TextStyle(fontSize: 15)),
+                  content: SingleChildScrollView(
+                    child: SelectableText(
+                      'Parsed expiry: ${u['expiry'] ?? 'null'}\n\n'
+                      'Date-related fields from server:\n${(u['expiry_raw'] ?? '').toString().isEmpty ? '(none found)' : u['expiry_raw']}\n\n'
+                      'All device_data keys:\n${u['device_data_keys'] ?? ''}',
+                      style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                    ),
+                  ),
+                  actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+                ),
+              ),
+              child: _row(Icons.event, 'Device Expiry', _expiryText(u['expiry']) ?? 'Not set (tap)', valColor: _expiryColor(u['expiry'])),
+            ),
             const SizedBox(height: 16),
             // actions: Live Track + Playback, then Reports full-width
             Row(children: [
