@@ -16,7 +16,8 @@ class TripsScreen extends StatefulWidget {
 class _TripsScreenState extends State<TripsScreen> {
   List<Map<String, dynamic>> _trips = [];
   bool _loading = true;
-  int _days = 1;
+  int _days = 7;
+  DateTimeRange? _customRange;
 
   @override
   void initState() {
@@ -26,7 +27,13 @@ class _TripsScreenState extends State<TripsScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final t = await ApiService.getTrips(deviceId: '${widget.device['id']}', days: _days);
+    final t = _customRange != null
+        ? await ApiService.getTrips(
+            deviceId: '${widget.device['id']}',
+            from: DateTime(_customRange!.start.year, _customRange!.start.month, _customRange!.start.day, 0, 0, 0),
+            to: DateTime(_customRange!.end.year, _customRange!.end.month, _customRange!.end.day, 23, 59, 59),
+          )
+        : await ApiService.getTrips(deviceId: '${widget.device['id']}', days: _days);
     if (!mounted) return;
     setState(() {
       _trips = t;
@@ -80,13 +87,20 @@ class _TripsScreenState extends State<TripsScreen> {
         // period selector
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-          child: Row(children: [
-            _chip('Today', 1),
-            const SizedBox(width: 8),
-            _chip('7 Days', 7),
-            const SizedBox(width: 8),
-            _chip('30 Days', 30),
-          ]),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              _chip('Today', 1),
+              const SizedBox(width: 8),
+              _chip('7 Days', 7),
+              const SizedBox(width: 8),
+              _chip('14 Days', 14),
+              const SizedBox(width: 8),
+              _chip('30 Days', 30),
+              const SizedBox(width: 8),
+              _customChip(),
+            ]),
+          ),
         ),
         Expanded(
           child: _loading
@@ -230,10 +244,13 @@ class _TripsScreenState extends State<TripsScreen> {
   }
 
   Widget _chip(String label, int days) {
-    final sel = _days == days;
+    final sel = _customRange == null && _days == days;
     return GestureDetector(
       onTap: () {
-        setState(() => _days = days);
+        setState(() {
+          _days = days;
+          _customRange = null;
+        });
         _load();
       },
       child: Container(
@@ -244,6 +261,41 @@ class _TripsScreenState extends State<TripsScreen> {
           border: Border.all(color: sel ? AppColors.teal : AppColors.line, width: 1.4),
         ),
         child: Text(label, style: TextStyle(color: sel ? Colors.white : AppColors.ink2, fontWeight: FontWeight.w700, fontSize: 12.5)),
+      ),
+    );
+  }
+
+  Widget _customChip() {
+    final sel = _customRange != null;
+    final label = sel
+        ? '${_customRange!.start.day}/${_customRange!.start.month} - ${_customRange!.end.day}/${_customRange!.end.month}'
+        : 'Custom';
+    return GestureDetector(
+      onTap: () async {
+        final now = DateTime.now();
+        final picked = await showDateRangePicker(
+          context: context,
+          firstDate: DateTime(now.year - 1),
+          lastDate: now,
+          initialDateRange: _customRange ?? DateTimeRange(start: now.subtract(const Duration(days: 1)), end: now),
+        );
+        if (picked != null) {
+          setState(() => _customRange = picked);
+          _load();
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.teal : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: sel ? AppColors.teal : AppColors.line, width: 1.4),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.calendar_today, size: 13, color: sel ? Colors.white : AppColors.ink2),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(color: sel ? Colors.white : AppColors.ink2, fontWeight: FontWeight.w700, fontSize: 12.5)),
+        ]),
       ),
     );
   }
