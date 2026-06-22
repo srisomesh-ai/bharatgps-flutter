@@ -41,6 +41,32 @@ class _TripsScreenState extends State<TripsScreen> {
     });
   }
 
+  Future<void> _showHistoryDebug() async {
+    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.teal)));
+    final h = await ApiService.getHistory(deviceId: '${widget.device['id']}', days: _customRange == null ? _days : 7);
+    final pts = (h['points'] as List?) ?? [];
+    if (!mounted) return;
+    Navigator.pop(context);
+    final moving = pts.where((p) => (p['spd'] ?? 0) >= 3).length;
+    final sample = pts.isNotEmpty ? pts.first.toString() : 'none';
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('History check', style: TextStyle(fontSize: 15)),
+        content: SingleChildScrollView(
+          child: Text('Period: ${_customRange == null ? '$_days day(s)' : 'custom'}\n'
+              'Total GPS points: ${pts.length}\n'
+              'Moving points (>=3 km/h): $moving\n'
+              'Distance: ${h['distance_km']} km\n\n'
+              'First point:\n$sample\n\n'
+              '${pts.isEmpty ? 'Server returned NO history — device has no recorded movement for this period.' : moving == 0 ? 'Points exist but none show movement >=3 km/h, so no trips formed.' : 'Movement exists — trips should appear.'}',
+              style: const TextStyle(fontSize: 12)),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ),
+    );
+  }
+
   String _fmtTime(String iso) {
     final d = DateTime.tryParse(iso.replaceFirst(' ', 'T'));
     if (d == null) return iso;
@@ -107,11 +133,13 @@ class _TripsScreenState extends State<TripsScreen> {
               ? const RouteLoader()
               : _trips.isEmpty
                   ? Center(
-                      child: Column(mainAxisSize: MainAxisSize.min, children: const [
-                        Icon(Icons.route_outlined, size: 50, color: AppColors.muted),
-                        SizedBox(height: 12),
-                        Text('No trips found', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                        Padding(padding: EdgeInsets.symmetric(horizontal: 50), child: Text('Trips are detected automatically when the vehicle moves. None recorded for this period.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: AppColors.muted))),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.route_outlined, size: 50, color: AppColors.muted),
+                        const SizedBox(height: 12),
+                        const Text('No trips found', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                        const Padding(padding: EdgeInsets.symmetric(horizontal: 50), child: Text('Trips are detected automatically when the vehicle moves. None recorded for this period.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: AppColors.muted))),
+                        const SizedBox(height: 14),
+                        TextButton.icon(onPressed: _showHistoryDebug, icon: const Icon(Icons.info_outline, size: 15), label: const Text('Check history data'), style: TextButton.styleFrom(foregroundColor: AppColors.teal)),
                       ]),
                     )
                   : ListView(
