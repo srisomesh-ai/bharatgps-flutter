@@ -190,9 +190,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: loadingThis ? null : () => _loadStats(u),
+              onPressed: loadingThis ? null : () { Haptics.light(); _loadStats(u); },
               icon: loadingThis
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal))
+                  ? const RouteMiniLoader(width: 28, height: 14)
                   : const Icon(Icons.show_chart, size: 15),
               label: Text(loadingThis ? 'Loading…' : 'Load today\u2019s stats'),
               style: OutlinedButton.styleFrom(foregroundColor: AppColors.teal, side: const BorderSide(color: Color(0xFFDCEBE9))),
