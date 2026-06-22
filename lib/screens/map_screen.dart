@@ -771,15 +771,11 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             const SizedBox(height: 16),
             // 2 tiles
             Builder(builder: (_) {
-              final ign = tBool((u['ts'] ?? {})['ignition']); // real engine status from device
-              final engineOn = ign == true;
-              final engineKnown = ign != null;
-              final engineLabel = !engineKnown ? (s == 'rn' ? 'ON' : (s == 'of' ? 'OFF' : '—')) : (engineOn ? 'ON' : 'OFF');
-              final engineColor = !engineKnown ? (s == 'rn' ? AppColors.green : (s == 'of' ? AppColors.red : AppColors.orange)) : (engineOn ? AppColors.green : AppColors.red);
+              final eng = _engineState(u); // smart: real ignition, else movement-based
               return Row(children: [
                 _tile('${s == 'of' ? '—' : (u['speed'] ?? 0)}', 'km/h'),
                 const SizedBox(width: 9),
-                _tile(engineLabel, 'Engine', color: engineColor),
+                _tile(eng['label'] as String, 'Engine', color: eng['color'] as Color),
               ]);
             }),
             const SizedBox(height: 14),
@@ -892,6 +888,30 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
         ),
       ),
     );
+  }
+
+  // Smart engine on/off:
+  //  1) if the ignition wire reports a value, trust it (most accurate)
+  //  2) otherwise infer from movement: moving / motion = ON, else OFF
+  Map<String, dynamic> _engineState(Map<String, dynamic> u) {
+    final ts = (u['ts'] ?? {}) as Map;
+    final ign = tBool(ts['ignition']);
+    final spd = (u['speed'] is num) ? (u['speed'] as num) : (num.tryParse('${u['speed']}') ?? 0);
+    final motion = tBool(ts['motion']);
+    final online = (u['online'] ?? '').toString();
+
+    if (ign != null) {
+      // ignition wire connected — use the real signal
+      return ign
+          ? {'label': 'ON', 'color': AppColors.green}
+          : {'label': 'OFF', 'color': AppColors.red};
+    }
+    // no ignition data — infer from movement
+    if (online == 'offline') return {'label': 'OFF', 'color': AppColors.red};
+    final moving = spd > 2 || motion == true;
+    return moving
+        ? {'label': 'ON', 'color': AppColors.green}
+        : {'label': 'OFF', 'color': AppColors.red};
   }
 
   Widget _tile(String v, String l, {Color? color}) => Expanded(
