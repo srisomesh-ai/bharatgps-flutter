@@ -46,16 +46,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    // show cached vehicles instantly, then refresh
-    if (ApiService.cachedDevices.isNotEmpty) {
-      _devices = ApiService.cachedDevices;
-      _loading = false;
-      for (final u in _devices) {
-        if (u['lat'] != null && u['lng'] != null) {
-          _animPos['${u['id']}'] = LatLng(_toD(u['lat']), _toD(u['lng']));
-        }
-      }
-    }
+    // Map is LIVE — always load fresh (don't seed from cache). Stale cached
+    // position/heading/tail would mislead the user into thinking it's current.
     _load();
     _loadGprs();
     _refresh = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
