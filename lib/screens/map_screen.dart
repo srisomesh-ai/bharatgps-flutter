@@ -24,7 +24,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   dynamic _focusId;
   String _search = '';
   String _mapType = 'normal'; // normal | google | satellite | hybrid
-  String _filter = 'all'; // all | rn (running) | id (idle) | of (offline)
   bool _showNames = true;
   Map<String, dynamic>? _selected; // for the mini-card
   Timer? _refresh;
@@ -181,82 +180,59 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   double _toD(dynamic v) => double.tryParse('$v') ?? 0;
 
-  // vehicles matching the current search + status filter
+  // vehicles matching the current search
   List<Map<String, dynamic>> _visibleDevices({bool needLatLng = false}) {
     return _devices.where((u) {
       if (needLatLng && (u['lat'] == null || u['lng'] == null)) return false;
       if (_search.isNotEmpty && !(u['name'] ?? '').toString().toLowerCase().contains(_search)) return false;
-      if (_filter != 'all' && stateOf(u['online'], u['speed']) != _filter) return false;
       return true;
     }).toList();
   }
 
-  String _filterLabel() {
-    switch (_filter) {
-      case 'rn':
-        return 'Running';
-      case 'id':
-        return 'Idle';
-      case 'of':
-        return 'Offline';
-      default:
-        return 'All Vehicles';
-    }
-  }
-
-  IconData _filterIcon() {
-    switch (_filter) {
-      case 'rn':
-        return Icons.navigation;
-      case 'id':
-        return Icons.pause_circle_outline;
-      case 'of':
-        return Icons.cloud_off;
-      default:
-        return Icons.people_alt_outlined;
-    }
-  }
-
-  void _showFilterMenu() {
-    final counts = {
-      'all': _devices.length,
-      'rn': _devices.where((u) => stateOf(u['online'], u['speed']) == 'rn').length,
-      'id': _devices.where((u) => stateOf(u['online'], u['speed']) == 'id').length,
-      'of': _devices.where((u) => stateOf(u['online'], u['speed']) == 'of').length,
-    };
+  void _showVehicleList() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (_) => Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
         decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.of(context).padding.bottom),
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 8 + MediaQuery.of(context).padding.bottom),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 38, height: 5, margin: const EdgeInsets.only(bottom: 14), decoration: BoxDecoration(color: const Color(0xFFE2E9E8), borderRadius: BorderRadius.circular(3))),
-          _filterOption('all', 'All Vehicles', Icons.people_alt_outlined, AppColors.teal, counts['all']!),
-          _filterOption('rn', 'Running', Icons.navigation, AppColors.green, counts['rn']!),
-          _filterOption('id', 'Idle', Icons.pause_circle_outline, AppColors.orange, counts['id']!),
-          _filterOption('of', 'Offline', Icons.cloud_off, AppColors.red, counts['of']!),
-        ]),
-      ),
-    );
-  }
-
-  Widget _filterOption(String key, String label, IconData ic, Color c, int count) {
-    final sel = _filter == key;
-    return InkWell(
-      onTap: () {
-        setState(() => _filter = key);
-        Navigator.pop(context);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
-        child: Row(children: [
-          Container(width: 38, height: 38, decoration: BoxDecoration(color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(11)), child: Icon(ic, size: 19, color: c)),
-          const SizedBox(width: 13),
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600))),
-          Text('$count', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.ink2)),
-          const SizedBox(width: 10),
-          if (sel) const Icon(Icons.check_circle, color: AppColors.teal, size: 20) else const SizedBox(width: 20),
+          Container(width: 38, height: 5, margin: const EdgeInsets.only(bottom: 10), decoration: BoxDecoration(color: const Color(0xFFE2E9E8), borderRadius: BorderRadius.circular(3))),
+          Row(children: [
+            const Text('Select Vehicle', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const Spacer(),
+            Text('${_devices.length} total', style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
+          ]),
+          const SizedBox(height: 8),
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              children: _devices.map((u) {
+                final s = stateOf(u['online'], u['speed']);
+                return InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (u['lat'] != null && u['lng'] != null) {
+                      _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 16);
+                      setState(() => _selected = u);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+                    decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.line))),
+                    child: Row(children: [
+                      Container(width: 10, height: 10, decoration: BoxDecoration(color: stateColor(s), shape: BoxShape.circle)),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(u['name'] ?? 'Vehicle', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600))),
+                      Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3), decoration: BoxDecoration(color: stateBg(s), borderRadius: BorderRadius.circular(20)), child: Text(stateLabels[s]!, style: TextStyle(color: stateColor(s), fontSize: 10, fontWeight: FontWeight.w700))),
+                    ]),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
         ]),
       ),
     );
@@ -389,42 +365,36 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ),
             ]),
           ),
-          // ===== count (filter) + map type =====
+          // ===== count (vehicle list) + map type =====
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(children: [
-              // vehicle filter dropdown (working)
-              GestureDetector(
-                onTap: _showFilterMenu,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 6)]),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(_filterIcon(), size: 17, color: AppColors.teal),
-                    const SizedBox(width: 7),
-                    Text('${_filterLabel()} (${visible.length})', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                    const Icon(Icons.keyboard_arrow_down, size: 18, color: AppColors.ink2),
-                  ]),
-                ),
-              ),
-              const Spacer(),
-              // map type toggle (horizontally scrollable so it never overflows)
-              Flexible(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  reverse: true,
+                // vehicle list dropdown (select a vehicle to focus)
+                GestureDetector(
+                  onTap: _showVehicleList,
                   child: Container(
-                    padding: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 6)]),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      _segBtn('Default', _mapType == 'normal', () => setState(() => _mapType = 'normal')),
-                      _segBtn('Google', _mapType == 'google', () => setState(() => _mapType = 'google')),
-                      _segBtn('Sat', _mapType == 'satellite', () => setState(() => _mapType = 'satellite')),
-                      _segBtn('Hybrid', _mapType == 'hybrid', () => setState(() => _mapType = 'hybrid')),
+                      const Icon(Icons.people_alt_outlined, size: 16, color: AppColors.teal),
+                      const SizedBox(width: 6),
+                      Text('${visible.length}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                      const Icon(Icons.keyboard_arrow_down, size: 17, color: AppColors.ink2),
                     ]),
                   ),
                 ),
-              ),
+                const Spacer(),
+                // map type toggle (Map / Google / Sat / Hybrid)
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 6)]),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    _segBtn('Map', _mapType == 'normal', () => setState(() => _mapType = 'normal')),
+                    _segBtn('Google', _mapType == 'google', () => setState(() => _mapType = 'google')),
+                    _segBtn('Sat', _mapType == 'satellite', () => setState(() => _mapType = 'satellite')),
+                    _segBtn('Hybrid', _mapType == 'hybrid', () => setState(() => _mapType = 'hybrid')),
+                  ]),
+                ),
             ]),
           ),
           // ===== MAP =====
@@ -577,9 +547,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
         decoration: BoxDecoration(color: active ? AppColors.teal : Colors.transparent, borderRadius: BorderRadius.circular(14)),
-        child: Text(label, style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w700, fontSize: 11.5)),
+        child: Text(label, style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w700, fontSize: 11)),
       ),
     );
   }
