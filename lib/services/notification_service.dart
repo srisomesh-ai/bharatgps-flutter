@@ -180,12 +180,11 @@ class NotificationService {
     );
   }
 
-  /// Preview a sound immediately — plays the audio file directly (reliable,
-  /// audible, works regardless of notification/channel state).
+  /// Preview a sound immediately — plays the audio file directly from assets
+  /// (reliable, audible). Returns null on success, or an error message.
   static final AudioPlayer _previewPlayer = AudioPlayer();
-  static Future<void> preview(AlertSound s) async {
+  static Future<String?> preview(AlertSound s) async {
     if (s.file == 'default') {
-      // play a short notification via the system default
       await _ensureChannel(s);
       await _fln.show(99999, 'Sound preview', 'Default notification tone',
           NotificationDetails(android: AndroidNotificationDetails(
@@ -193,24 +192,16 @@ class NotificationService {
             importance: Importance.high, priority: Priority.high, playSound: true,
             icon: '@mipmap/ic_launcher',
           )));
-      return;
+      return null;
     }
     try {
       await _previewPlayer.stop();
-      // play the raw resource directly: android.resource://<package>/raw/<file>
-      await _previewPlayer.play(
-        UrlSource('android.resource://com.bharatgps.bharatgps_app/raw/${s.file}'),
-      );
-    } catch (_) {
-      // fallback: try notification-based preview
-      await _ensureChannel(s);
-      await _fln.show(99999, 'Sound preview', '${s.label} alert tone',
-          NotificationDetails(android: AndroidNotificationDetails(
-            'bgps_alerts_${s.id}', 'Alerts — ${s.label}',
-            importance: Importance.high, priority: Priority.high, playSound: true,
-            sound: RawResourceAndroidNotificationSound(s.file),
-            icon: '@mipmap/ic_launcher',
-          )));
+      await _previewPlayer.setReleaseMode(ReleaseMode.stop);
+      // play from bundled assets: assets/sounds/<file>.mp3
+      await _previewPlayer.play(AssetSource('sounds/${s.file}.mp3'));
+      return null;
+    } catch (e) {
+      return 'Preview failed: $e';
     }
   }
 
