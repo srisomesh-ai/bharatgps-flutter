@@ -79,7 +79,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Container(
             width: double.infinity,
             decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppColors.teal, AppColors.teal2])),
-            padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 18, 16, 50),
+            padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 18, 16, 18),
             child: Row(children: [
               const Text('Profile', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800)),
               const Spacer(),
@@ -90,11 +90,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               children: [
-                Transform.translate(
-                  offset: const Offset(0, -35),
-                  child: Column(children: [
+                Column(children: [
                     // profile card
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -169,7 +167,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 12),
                     const Text('Bharat GPS Tracker · v1.0.0', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: AppColors.muted)),
                   ]),
-                ),
               ],
             ),
           ),
