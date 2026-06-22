@@ -130,7 +130,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       itemCount: list.length,
-                      itemBuilder: (_, i) => _vehicleCard(list[i]),
+                      itemBuilder: (_, i) => _animatedCard(i, _vehicleCard(list[i])),
                     ),
                   ),
           ),
@@ -194,6 +194,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ]),
         ),
       ),
+    );
+  }
+
+  // Wraps an existing card in a side-entry slide+fade. Does NOT change the card itself.
+  // Re-animates whenever the filter changes (key includes _filter), staggered per row.
+  Widget _animatedCard(int index, Widget child) {
+    return TweenAnimationBuilder<double>(
+      key: ValueKey('$_filter-$index'),
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 350 + (index.clamp(0, 8) * 45)),
+      curve: Curves.easeOutCubic,
+      builder: (context, t, c) {
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(-60 * (1 - t), 0), // slide in from the left
+            child: c,
+          ),
+        );
+      },
+      child: child,
     );
   }
 
