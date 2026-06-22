@@ -518,7 +518,7 @@ class ApiService {
     final res = await http.get(_u(host!, 'destroy_alert', {
       'lang': 'en',
       'user_api_hash': hash!,
-      'id': '$id',
+      'alert_id': '$id',
     })).timeout(const Duration(seconds: 20));
     if (res.statusCode == 200) {
       final j = jsonDecode(res.body);
