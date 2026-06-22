@@ -16,7 +16,7 @@ class TripsScreen extends StatefulWidget {
 class _TripsScreenState extends State<TripsScreen> {
   List<Map<String, dynamic>> _trips = [];
   bool _loading = true;
-  int _days = 7;
+  int _days = 1;
   DateTimeRange? _customRange;
 
   @override
