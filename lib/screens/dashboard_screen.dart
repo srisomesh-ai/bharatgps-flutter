@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'main_shell.dart';
 import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
 import '../widgets/loaders.dart';
@@ -84,9 +85,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(width: 9),
                     const Text('Bharat GPS Tracker', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
                     const Spacer(),
-                    IconButton(onPressed: () => Navigator.pushReplacementNamed(context, '/alerts'), icon: const Icon(Icons.notifications_none, color: Colors.white, size: 23)),
+                    IconButton(onPressed: () => MainShell.of(context)?.goTo(3), icon: const Icon(Icons.notifications_none, color: Colors.white, size: 23)),
                     GestureDetector(
-                      onTap: () => Navigator.pushReplacementNamed(context, '/profile'),
+                      onTap: () => MainShell.of(context)?.goTo(4),
                       child: Container(width: 38, height: 38, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: const Icon(Icons.person_outline, color: AppColors.teal, size: 22)),
                     ),
                   ],
@@ -136,7 +137,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           // ===== Track banner =====
           GestureDetector(
-            onTap: () => Navigator.pushReplacementNamed(context, '/map'),
+            onTap: () => MainShell.of(context)?.goTo(2),
             child: Container(
               margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
               padding: const EdgeInsets.all(14),
@@ -166,7 +167,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: const BottomNav(current: 0),
     );
   }
 
@@ -226,7 +226,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         : (s == 'id' ? [const Color(0xFFFEF8EE), Colors.white] : [const Color(0xFFFDF1F0), Colors.white]);
     final addr = (u['address'] ?? '').toString().isNotEmpty ? u['address'].toString() : 'Locating…';
     return GestureDetector(
-      onTap: () => Navigator.pushReplacementNamed(context, '/map', arguments: u['id']),
+      onTap: () => MainShell.of(context)?.goTo(2),
       child: Container(
         margin: const EdgeInsets.only(bottom: 11),
         padding: const EdgeInsets.all(12),
