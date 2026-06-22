@@ -720,6 +720,50 @@ class ApiService {
     }
   }
 
+  /// SHARING — create a public tracking link for a vehicle that expires.
+  /// Returns the share hash/url or null on failure.
+  static Future<Map<String, dynamic>?> createSharing({
+    required List<int> devices,
+    required String name,
+    required DateTime expiresAt,
+  }) async {
+    try {
+      String two(int n) => n.toString().padLeft(2, '0');
+      final exp = '${expiresAt.year}-${two(expiresAt.month)}-${two(expiresAt.day)} '
+          '${two(expiresAt.hour)}:${two(expiresAt.minute)}:${two(expiresAt.second)}';
+      final res = await http.post(
+        _u(host!, 'sharing', {'lang': 'en', 'user_api_hash': hash!}),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'devices': devices,
+          'active': true,
+          'name': name,
+          'enable_expiration_date': true,
+          'expiration_date': exp,
+        }),
+      ).timeout(const Duration(seconds: 25));
+      if (res.statusCode == 200) {
+        final j = jsonDecode(res.body);
+        if (j is Map) {
+          final m = Map<String, dynamic>.from(j);
+          // some servers wrap it under 'item'
+          final item = (m['item'] is Map) ? Map<String, dynamic>.from(m['item']) : m;
+          final hashVal = item['hash'] ?? m['hash'];
+          if (hashVal != null) {
+            return {
+              'hash': hashVal.toString(),
+              'id': item['id'] ?? m['id'],
+              'expiration_date': item['expiration_date'] ?? exp,
+              // public link patterns vary by server; the most common GPSWOX one:
+              'url': 'https://$host/sharing/${hashVal.toString()}',
+            };
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// USER plan/profile data.
   static Future<Map<String, dynamic>?> getUserData() async {
     try {
