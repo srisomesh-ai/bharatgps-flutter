@@ -251,15 +251,19 @@ class ApiService {
     for (int i = 1; i < points.length; i++) {
       dist += _haversine(points[i - 1], points[i]);
     }
+    // STOPS — detect by clustering: consecutive points that stay within ~35m
+    // of an anchor for >= 90s count as a stop. This is far more reliable than
+    // trusting the speed field (which many devices report as 0 or noisy).
     final stops = <Map<String, dynamic>>[];
     int i = 0;
     while (i < points.length) {
-      // a "stop" = speed at or below 3 km/h (stopped or idling)
-      if ((points[i]['spd'] as int) <= 3) {
-        int j = i;
-        while (j < points.length && (points[j]['spd'] as int) <= 3) {
-          j++;
-        }
+      int j = i + 1;
+      // extend the cluster while points stay near the anchor point i
+      while (j < points.length && _haversine(points[i], points[j]) * 1000 <= 35) {
+        j++;
+      }
+      // cluster is points[i .. j-1]
+      if (j - 1 > i) {
         final t0 = DateTime.tryParse(points[i]['t'].toString().replaceFirst(' ', 'T'));
         final t1 = DateTime.tryParse(points[j - 1]['t'].toString().replaceFirst(' ', 'T'));
         if (t0 != null && t1 != null) {
@@ -269,15 +273,14 @@ class ApiService {
               'lat': points[i]['lat'], 'lng': points[i]['lng'],
               'mins': (secs / 60).round(),
               'secs': secs,
-              'arrived': points[i]['t'],   // when it stopped
-              'departed': points[j - 1]['t'], // when it moved again
+              'arrived': points[i]['t'],
+              'departed': points[j - 1]['t'],
             });
           }
         }
         i = j;
       } else {
-        // also detect a stop when the device went silent (big time gap between
-        // consecutive moving points usually means it was parked/off)
+        // not a cluster — but check for a big time gap (device was off/parked)
         if (i + 1 < points.length) {
           final t0 = DateTime.tryParse(points[i]['t'].toString().replaceFirst(' ', 'T'));
           final t1 = DateTime.tryParse(points[i + 1]['t'].toString().replaceFirst(' ', 'T'));
@@ -446,6 +449,24 @@ class ApiService {
   /// Fetch the device's real expiry date from /edit_device_data (the panel's
   /// edit form). get_devices often returns null for expiration_date even when
   /// the panel has a date — this endpoint loads the full editable record.
+  /// Debug: raw edit_device_data response (to find where expiry lives).
+  static Future<String> fetchDeviceExpiryRaw(String deviceId) async {
+    try {
+      final res = await http.get(_u(host!, 'edit_device_data', {
+        'lang': 'en',
+        'user_api_hash': hash!,
+        'device_id': deviceId,
+      })).timeout(const Duration(seconds: 20));
+      // also get user-level expiry
+      final ud = await getUserData();
+      return 'HTTP ${res.statusCode}\nhost: $host\n\n'
+          'USER expiry: ${ud?['expiration_date']}\nUSER days_left: ${ud?['days_left']}\n\n'
+          'EDIT_DEVICE_DATA:\n${res.body}';
+    } catch (e) {
+      return 'ERROR: $e';
+    }
+  }
+
   static Future<String?> fetchDeviceExpiry(String deviceId) async {
     try {
       final res = await http.get(_u(host!, 'edit_device_data', {
@@ -748,6 +769,33 @@ class ApiService {
         'date_from': '${dd(fromDay)} 00:00:00',
         'date_to': '${dd(now)} 23:59:59',
       })).timeout(const Duration(seconds: 25));
+      return 'HTTP ${res.statusCode}\nhost: $host\n\n${res.body}';
+    } catch (e) {
+      return 'ERROR: $e';
+    }
+  }
+
+  /// Debug: raw response from POST /sharing (to diagnose share failures).
+  static Future<String> createSharingRaw({
+    required List<int> devices,
+    required String name,
+    required DateTime expiresAt,
+  }) async {
+    try {
+      String two(int n) => n.toString().padLeft(2, '0');
+      final exp = '${expiresAt.year}-${two(expiresAt.month)}-${two(expiresAt.day)} '
+          '${two(expiresAt.hour)}:${two(expiresAt.minute)}:${two(expiresAt.second)}';
+      final res = await http.post(
+        _u(host!, 'sharing', {'lang': 'en', 'user_api_hash': hash!}),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'devices': devices,
+          'active': true,
+          'name': name,
+          'enable_expiration_date': true,
+          'expiration_date': exp,
+        }),
+      ).timeout(const Duration(seconds: 25));
       return 'HTTP ${res.statusCode}\nhost: $host\n\n${res.body}';
     } catch (e) {
       return 'ERROR: $e';
