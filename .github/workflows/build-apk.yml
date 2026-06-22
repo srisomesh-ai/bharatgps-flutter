@@ -68,7 +68,7 @@ jobs:
         run: |
           mkdir -p assets/sounds
           if [ -d android/app/src/main/res/raw ]; then
-            for f in android/app/src/main/res/raw/*.mp3; do
+            for f in android/app/src/main/res/raw/*.mp3 android/app/src/main/res/raw/*.wav android/app/src/main/res/raw/*.ogg; do
               [ -e "$f" ] || continue
               cp "$f" assets/sounds/
             done
