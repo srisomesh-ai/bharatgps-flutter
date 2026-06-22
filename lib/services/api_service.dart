@@ -134,8 +134,6 @@ class ApiService {
         dd['subscription_expiration'], d['subscription_expiration'],
         dd['sim_expiration_date'], d['sim_expiration_date'],
       ]) ?? _scanExpiry(dd) ?? _scanExpiry(d),
-      'expiry_raw': dd.entries.map((e) => '${e.key}=${e.value}').where((s) => s.toLowerCase().contains('exp') || s.toLowerCase().contains('date') || s.toLowerCase().contains('valid') || s.toLowerCase().contains('renew') || s.toLowerCase().contains('subscrib')).join('\n'),
-      'device_data_keys': dd.keys.join(', '),
       'tail': (d['tail'] is List)
           ? (d['tail'] as List)
               .where((p) => p is Map && p['lat'] != null && p['lng'] != null)
