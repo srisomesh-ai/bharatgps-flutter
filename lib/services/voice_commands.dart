@@ -15,10 +15,16 @@ class VoiceAction {
 class VoiceCommands {
   static final SpeechToText _speech = SpeechToText();
   static bool _available = false;
+  static void Function()? _onDone;
 
   static Future<bool> init() async {
     try {
-      _available = await _speech.initialize(onError: (_) {}, onStatus: (_) {});
+      _available = await _speech.initialize(
+        onError: (_) => _onDone?.call(),
+        onStatus: (status) {
+          if (status == 'done' || status == 'notListening') _onDone?.call();
+        },
+      );
     } catch (_) {
       _available = false;
     }
@@ -36,22 +42,15 @@ class VoiceCommands {
         return;
       }
     }
+    _onDone = onDone;
     await _speech.listen(
       onResult: (r) {
-        if (r.finalResult) {
-          onResult(r.recognizedWords);
-        }
+        if (r.finalResult) onResult(r.recognizedWords);
       },
       listenFor: const Duration(seconds: 6),
       pauseFor: const Duration(seconds: 3),
       localeId: 'en_IN',
-      cancelOnError: true,
-      partialResults: false,
     );
-    // poll for completion
-    _speech.statusListener = (status) {
-      if (status == 'done' || status == 'notListening') onDone();
-    };
   }
 
   static Future<void> stop() async => _speech.stop();
