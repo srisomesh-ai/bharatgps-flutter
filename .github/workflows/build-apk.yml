@@ -64,6 +64,18 @@ jobs:
             cd - >/dev/null
           fi
 
+      - name: Copy sounds to assets (for in-app preview playback)
+        run: |
+          mkdir -p assets/sounds
+          if [ -d android/app/src/main/res/raw ]; then
+            for f in android/app/src/main/res/raw/*.mp3; do
+              [ -e "$f" ] || continue
+              cp "$f" assets/sounds/
+            done
+          fi
+          echo "assets/sounds now contains:"
+          ls -1 assets/sounds/ 2>/dev/null || echo "(none)"
+
       - name: Patch manifest (name, internet, cleartext, notif permission)
         run: |
           python3 - <<'PY'
