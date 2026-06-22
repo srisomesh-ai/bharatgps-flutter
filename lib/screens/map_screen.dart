@@ -740,6 +740,7 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
       ),
     );
     if (ok != true) return;
+    Haptics.heavy(); // strong feedback for this critical action
     setState(() => _sending = true);
     final success = await ApiService.sendEngineCommand('${widget.device['id']}', cut ? 'engineStop' : 'engineResume');
     if (!mounted) return;
@@ -825,7 +826,7 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             // actions: Live Track + Playback, then Reports full-width
             Row(children: [
               Expanded(child: ElevatedButton.icon(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () { Haptics.medium(); Navigator.pop(context); },
                 icon: const Icon(Icons.location_on, size: 18),
                 label: const Text('Live Track'),
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
@@ -833,6 +834,7 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
               const SizedBox(width: 10),
               Expanded(child: OutlinedButton.icon(
                 onPressed: () {
+                  Haptics.medium();
                   Navigator.pop(context);
                   showModalBottomSheet(
                     context: context,
@@ -851,7 +853,7 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => _navigateTo(u),
+                onPressed: () { Haptics.medium(); _navigateTo(u); },
                 icon: const Icon(Icons.directions, size: 18),
                 label: const Text('Navigate (Google Maps)'),
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
@@ -862,6 +864,7 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () {
+                  Haptics.medium();
                   Navigator.pop(context); // close the detail sheet first
                   // switch to the Activity tab using the named route (replaces shell)
                   Navigator.pushReplacementNamed(context, '/activity');
