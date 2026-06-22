@@ -272,10 +272,14 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getTrips({
     required String deviceId,
     int days = 1,
+    DateTime? from,
+    DateTime? to,
     int stopMinutes = 5,
     int moveSpeed = 3, // km/h above which the vehicle is "moving"
   }) async {
-    final hist = await getHistory(deviceId: deviceId, days: days);
+    final hist = (from != null && to != null)
+        ? await getHistory(deviceId: deviceId, from: from, to: to)
+        : await getHistory(deviceId: deviceId, days: days);
     final pts = (hist['points'] as List?) ?? [];
     final trips = <Map<String, dynamic>>[];
     if (pts.isEmpty) return trips;
