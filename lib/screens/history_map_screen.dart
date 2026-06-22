@@ -90,10 +90,18 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
       if ((a['spd'] as int? ?? 0) <= 2) continue;
       markers.add(Marker(
         point: LatLng(a['lat'], a['lng']),
-        width: 22, height: 22,
+        width: 24, height: 24,
         child: Transform.rotate(
           angle: brng * 3.14159265 / 180.0,
-          child: const Icon(Icons.navigation, color: AppColors.teal, size: 18),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.teal,
+              shape: BoxShape.circle,
+              boxShadow: const [BoxShadow(color: Color(0x44000000), blurRadius: 3)],
+            ),
+            padding: const EdgeInsets.all(3),
+            child: const Icon(Icons.navigation, color: Colors.white, size: 14),
+          ),
         ),
       ));
     }
@@ -225,6 +233,7 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
                         point: LatLng(s['lat'], s['lng']),
                         width: 96, height: 52,
                         child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
                           onTap: () => _showStopInfo(s),
                           child: _labeledPin('${s['mins'] ?? ''}m stop', AppColors.orange, Icons.pause),
                         ),
