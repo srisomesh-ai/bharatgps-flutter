@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
+import 'main_shell.dart';
 import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
 import 'troubleshoot_sheet.dart';
@@ -338,7 +339,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 const SizedBox(width: 9),
                 const Text('Bharat GPS Tracker', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
                 const Spacer(),
-                IconButton(onPressed: () => Navigator.pushReplacementNamed(context, '/alerts'), icon: const Icon(Icons.notifications_none, color: Colors.white, size: 23), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                IconButton(onPressed: () => MainShell.of(context)?.goTo(3), icon: const Icon(Icons.notifications_none, color: Colors.white, size: 23), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
                 const SizedBox(width: 14),
                 const Icon(Icons.filter_list, color: Colors.white, size: 23),
               ]),
@@ -464,7 +465,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           ),
         ],
       ),
-      bottomNavigationBar: const BottomNav(current: 2),
     );
   }
 
@@ -818,7 +818,11 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => Navigator.pushReplacementNamed(context, '/activity'),
+                onPressed: () {
+                  Navigator.pop(context); // close the detail sheet first
+                  // switch to the Activity tab using the named route (replaces shell)
+                  Navigator.pushReplacementNamed(context, '/activity');
+                },
                 icon: const Icon(Icons.bar_chart, size: 18),
                 label: const Text('Reports & History'),
                 style: OutlinedButton.styleFrom(foregroundColor: AppColors.ink2, side: const BorderSide(color: AppColors.line), padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
