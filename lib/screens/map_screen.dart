@@ -848,11 +848,26 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             const Divider(height: 1, color: AppColors.line),
             _row(Icons.wifi, 'GPS Signal', gps, valColor: gps == 'Strong' ? AppColors.green : AppColors.red),
             const Divider(height: 1, color: AppColors.line),
-            _row(Icons.event, 'Device Expiry',
-                _loadingExpiry
-                    ? 'Checking…'
-                    : (_expiryText(u['expiry'] ?? _fetchedExpiry) ?? 'Not set'),
-                valColor: _expiryColor(u['expiry'] ?? _fetchedExpiry)),
+            GestureDetector(
+              onLongPress: () async {
+                // long-press the expiry row to see the raw server data (debug)
+                final raw = await ApiService.fetchDeviceExpiryRaw('${widget.device['id']}');
+                if (!context.mounted) return;
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Expiry — raw server data'),
+                    content: SingleChildScrollView(child: Text(raw, style: const TextStyle(fontSize: 10))),
+                    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+                  ),
+                );
+              },
+              child: _row(Icons.event, 'Device Expiry',
+                  _loadingExpiry
+                      ? 'Checking…'
+                      : (_expiryText(u['expiry'] ?? _fetchedExpiry) ?? 'Not set'),
+                  valColor: _expiryColor(u['expiry'] ?? _fetchedExpiry)),
+            ),
             const SizedBox(height: 16),
             // actions: Live Track + Playback, then Reports full-width
             Row(children: [
@@ -1124,9 +1139,21 @@ class _ShareSheetState extends State<_ShareSheet> {
     if (!mounted) return;
     setState(() => _creating = false);
     if (res == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Could not create share link. Sharing may not be enabled on your account.'),
-      ));
+      // show the raw server response so we can see why it failed
+      final raw = await ApiService.createSharingRaw(
+        devices: [int.tryParse('${widget.device['id']}') ?? 0],
+        name: name,
+        expiresAt: expiresAt,
+      );
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Share — server response'),
+          content: SingleChildScrollView(child: Text(raw, style: const TextStyle(fontSize: 11))),
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+        ),
+      );
       return;
     }
     final link = res['url'] as String;
