@@ -226,7 +226,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         : (s == 'id' ? [const Color(0xFFFEF8EE), Colors.white] : [const Color(0xFFFDF1F0), Colors.white]);
     final addr = (u['address'] ?? '').toString().isNotEmpty ? u['address'].toString() : 'Locating…';
     return GestureDetector(
-      onTap: () => MainShell.of(context)?.goTo(2),
+      onTap: () => MainShell.of(context)?.focusVehicleOnMap(u['id']),
       child: Container(
         margin: const EdgeInsets.only(bottom: 11),
         padding: const EdgeInsets.all(12),
