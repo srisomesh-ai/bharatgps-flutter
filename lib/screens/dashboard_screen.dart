@@ -174,7 +174,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final active = _filter == filterKey && filterKey.isNotEmpty;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _filter = (_filter == filterKey) ? '' : filterKey),
+        onTap: () { Haptics.light(); setState(() => _filter = (_filter == filterKey) ? '' : filterKey); },
         child: Container(
           padding: const EdgeInsets.fromLTRB(4, 12, 4, 11),
           decoration: BoxDecoration(
@@ -226,7 +226,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         : (s == 'id' ? [const Color(0xFFFEF8EE), Colors.white] : [const Color(0xFFFDF1F0), Colors.white]);
     final addr = (u['address'] ?? '').toString().isNotEmpty ? u['address'].toString() : 'Locating…';
     return GestureDetector(
-      onTap: () => MainShell.of(context)?.focusVehicleOnMap(u['id']),
+      onTap: () { Haptics.light(); MainShell.of(context)?.focusVehicleOnMap(u['id']); },
       child: Container(
         margin: const EdgeInsets.only(bottom: 11),
         padding: const EdgeInsets.all(12),
