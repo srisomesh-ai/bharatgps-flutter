@@ -79,9 +79,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Container(
             width: double.infinity,
             decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppColors.teal, AppColors.teal2])),
-            padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 14, 16, 55),
+            padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 18, 16, 50),
             child: Row(children: [
-              const Text('Profile', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+              const Text('Profile', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800)),
               const Spacer(),
               IconButton(onPressed: () => Navigator.pushReplacementNamed(context, '/alerts'), icon: const Icon(Icons.notifications_none, color: Colors.white), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
               const SizedBox(width: 14),
@@ -93,7 +93,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               children: [
                 Transform.translate(
-                  offset: const Offset(0, -45),
+                  offset: const Offset(0, -35),
                   child: Column(children: [
                     // profile card
                     Container(
