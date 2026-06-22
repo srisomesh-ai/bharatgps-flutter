@@ -74,6 +74,10 @@ jobs:
               s=re.sub(r'(<manifest[^>]*>)', r'\1\n    <uses-permission android:name="android.permission.INTERNET"/>', s, count=1)
           if 'POST_NOTIFICATIONS' not in s:
               s=re.sub(r'(<manifest[^>]*>)', r'\1\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>', s, count=1)
+          # allow launching maps/geo intents (Android 11+ visibility)
+          if '<queries>' not in s:
+              q='<queries><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="geo"/></intent><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent></queries>'
+              s=re.sub(r'(<manifest[^>]*>)', r'\1\n    '+q, s, count=1)
           s=re.sub(r'android:label="[^"]*"', 'android:label="Bharat GPS Tracker"', s, count=1)
           if 'usesCleartextTraffic' not in s:
               s=re.sub(r'(<application)', r'\1 android:usesCleartextTraffic="true"', s, count=1)
@@ -112,9 +116,9 @@ jobs:
                       s=re.sub(r'(dependencies\s*\{)', r'\1\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")', s, count=1)
                   else:
                       s=s.rstrip()+'\n\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")\n}\n'
-              # minSdk = 21
-              s=re.sub(r'minSdk\s*=\s*flutter\.minSdkVersion', 'minSdk = 21', s)
-              s=re.sub(r'minSdk\s*=\s*\d+', 'minSdk = 21', s)
+              # minSdk = 23
+              s=re.sub(r'minSdk\s*=\s*flutter\.minSdkVersion', 'minSdk = 23', s)
+              s=re.sub(r'minSdk\s*=\s*\d+', 'minSdk = 23', s)
           else:
               if 'coreLibraryDesugaringEnabled' not in s:
                   if re.search(r'compileOptions\s*\{', s):
@@ -126,8 +130,8 @@ jobs:
                       s=re.sub(r'(dependencies\s*\{)', r'\1\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"', s, count=1)
                   else:
                       s=s.rstrip()+'\n\ndependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"\n}\n'
-              s=re.sub(r'minSdk(Version)?\s+flutter\.minSdkVersion', 'minSdk 21', s)
-              s=re.sub(r'minSdk(Version)?\s+\d+', 'minSdk 21', s)
+              s=re.sub(r'minSdk(Version)?\s+flutter\.minSdkVersion', 'minSdk 23', s)
+              s=re.sub(r'minSdk(Version)?\s+\d+', 'minSdk 23', s)
 
           open(p,'w').write(s)
           print('desugaring + minSdk patched')
@@ -174,6 +178,13 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
+
+      - name: Patch plugin gradle files (remove dead jcenter repo)
+        run: |
+          # Some plugins (e.g. older speech_to_text) still reference jcenter(),
+          # which is shut down and breaks the build. Strip it from any plugin.
+          find ~/.pub-cache -name "build.gradle" -path "*android*" -exec sed -i '/jcenter()/d' {} + 2>/dev/null || true
+          echo "patched plugin gradle files"
 
       - name: Build release APK
         run: flutter build apk --release
