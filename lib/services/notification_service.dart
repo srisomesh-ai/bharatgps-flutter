@@ -27,28 +27,25 @@ const kAlertSounds = <AlertSound>[
   AlertSound('default', 'Default Notification', 'default', 'Default'),
 
   // English voice audios
-  AlertSound('en_audio1', 'Audio 1', 'en_audio1', 'English'),
-  AlertSound('en_audio2', 'Audio 2', 'en_audio2', 'English'),
-  AlertSound('en_audio3', 'Audio 3', 'en_audio3', 'English'),
-  AlertSound('en_audio4', 'Audio 4', 'en_audio4', 'English'),
-  AlertSound('en_audio5', 'Audio 5', 'en_audio5', 'English'),
-  AlertSound('en_audio6', 'Audio 6', 'en_audio6', 'English'),
+  AlertSound('en_engon', 'Engine On', 'en_engon', 'English'),
+  AlertSound('en_engoff', 'Engine Off', 'en_engoff', 'English'),
+  AlertSound('en_speed', 'Speed', 'en_speed', 'English'),
+  AlertSound('en_online', 'Online', 'en_online', 'English'),
+  AlertSound('en_offline', 'Offline', 'en_offline', 'English'),
 
   // Hindi voice audios
-  AlertSound('hi_audio1', 'Audio 1', 'hi_audio1', 'Hindi'),
-  AlertSound('hi_audio2', 'Audio 2', 'hi_audio2', 'Hindi'),
-  AlertSound('hi_audio3', 'Audio 3', 'hi_audio3', 'Hindi'),
-  AlertSound('hi_audio4', 'Audio 4', 'hi_audio4', 'Hindi'),
-  AlertSound('hi_audio5', 'Audio 5', 'hi_audio5', 'Hindi'),
-  AlertSound('hi_audio6', 'Audio 6', 'hi_audio6', 'Hindi'),
+  AlertSound('hi_eng_on', 'Engine On', 'hi_eng_on', 'Hindi'),
+  AlertSound('hi_eng_off', 'Engine Off', 'hi_eng_off', 'Hindi'),
+  AlertSound('hi_speed', 'Speed', 'hi_speed', 'Hindi'),
+  AlertSound('hi_online', 'Online', 'hi_online', 'Hindi'),
+  AlertSound('hi_offline', 'Offline', 'hi_offline', 'Hindi'),
 
   // Telugu voice audios
-  AlertSound('te_audio1', 'Audio 1', 'te_audio1', 'Telugu'),
-  AlertSound('te_audio2', 'Audio 2', 'te_audio2', 'Telugu'),
-  AlertSound('te_audio3', 'Audio 3', 'te_audio3', 'Telugu'),
-  AlertSound('te_audio4', 'Audio 4', 'te_audio4', 'Telugu'),
-  AlertSound('te_audio5', 'Audio 5', 'te_audio5', 'Telugu'),
-  AlertSound('te_audio6', 'Audio 6', 'te_audio6', 'Telugu'),
+  AlertSound('te_engon', 'Engine On', 'te_engon', 'Telugu'),
+  AlertSound('te_engoff', 'Engine Off', 'te_engoff', 'Telugu'),
+  AlertSound('te_speed', 'Speed', 'te_speed', 'Telugu'),
+  AlertSound('te_online', 'Online', 'te_online', 'Telugu'),
+  AlertSound('te_offline', 'Offline', 'te_offline', 'Telugu'),
 
   // Other tones
   AlertSound('siren', 'Siren', 'siren', 'Other Tones'),
