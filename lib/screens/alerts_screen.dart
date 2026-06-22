@@ -444,7 +444,7 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
                 children: _types.map((ty) {
                   final sel = _type == ty['t'];
                   return GestureDetector(
-                    onTap: () => setState(() => _type = ty['t'] as String),
+                    onTap: () { Haptics.select(); setState(() => _type = ty['t'] as String); },
                     child: Container(
                       decoration: BoxDecoration(
                         color: sel ? const Color(0xFFF1F8F7) : Colors.white,
@@ -494,12 +494,12 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: GestureDetector(
-                      onTap: () => setState(() {
+                      onTap: () { Haptics.select(); setState(() {
                         _soundCategory = cat;
                         // auto-select first sound in category (or default)
                         final list = soundsInCategory(cat);
                         if (list.isNotEmpty) _soundId = list.first.id;
-                      }),
+                      }); },
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
@@ -520,7 +520,7 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
                 child: Column(children: soundsInCategory(_soundCategory).map((s) {
                   final sel = _soundId == s.id;
                   return InkWell(
-                    onTap: () => setState(() => _soundId = s.id),
+                    onTap: () { Haptics.select(); setState(() => _soundId = s.id); },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                       decoration: BoxDecoration(border: s == soundsInCategory(_soundCategory).last ? null : const Border(bottom: BorderSide(color: AppColors.line))),
@@ -591,7 +591,7 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
         SizedBox(
           width: double.infinity, height: 52,
           child: ElevatedButton.icon(
-            onPressed: _creating ? null : _create,
+            onPressed: _creating ? null : () { Haptics.medium(); _create(); },
             icon: _creating ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.add),
             label: const Text('Create Alert', style: TextStyle(fontWeight: FontWeight.w700)),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
