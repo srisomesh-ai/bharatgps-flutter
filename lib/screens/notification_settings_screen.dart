@@ -186,7 +186,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     switch (type) {
       case 'overspeed': return Icons.speed;
       case 'move_duration': return Icons.trending_flat;
+      case 'engine_on': return Icons.power_settings_new;
+      case 'engine_off': return Icons.power_off;
       case 'ignition_duration': return Icons.power_settings_new;
+      case 'offline': return Icons.wifi_off;
       case 'powercut': return Icons.flash_on;
       case 'lowbattery': return Icons.battery_alert;
       default: return Icons.notifications;
