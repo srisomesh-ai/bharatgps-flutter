@@ -41,6 +41,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Ticker? _ticker;
   int _glideStartMs = 0;
   double _pulseValue = 0; // 0..1 pulse phase for running markers
+  double _mapRotation = 0; // current map rotation in degrees (to keep labels upright)
   int _lastDrop = 0; // last breadcrumb drop time (ms)
   static const _glideMs = 5000;   // matches web GLIDE_MS / POLL_MS
   static const _maxTail = 40;
@@ -307,12 +308,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         point: pos,
         width: 200,
         height: 96,
+        rotate: true, // keep the marker upright when the map is rotated (labels stay readable)
         child: GestureDetector(
           onTap: () {
             setState(() => _selected = u);
             _map.move(pos, _map.camera.zoom < 13 ? 14 : _map.camera.zoom);
           },
-          child: _VehicleMarker(device: u, state: s, heading: heading, pulse: _pulseValue, showName: _showNames),
+          child: _VehicleMarker(device: u, state: s, heading: heading, pulse: _pulseValue, showName: _showNames, mapRotation: _mapRotation),
         ),
       );
     }).toList();
@@ -401,6 +403,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   initialCenter: center,
                   initialZoom: _devices.isEmpty ? 5 : 12,
                   onTap: (_, __) => setState(() => _selected = null),
+                  onPositionChanged: (camera, _) {
+                    // keep marker labels upright as the map rotates
+                    if ((camera.rotation - _mapRotation).abs() > 0.5) {
+                      setState(() => _mapRotation = camera.rotation);
+                    }
+                  },
                 ),
                 children: [
                   TileLayer(
@@ -597,7 +605,8 @@ class _VehicleMarker extends StatelessWidget {
   final double heading;
   final double pulse; // 0..1 from parent ticker
   final bool showName;
-  const _VehicleMarker({required this.device, required this.state, required this.heading, required this.pulse, this.showName = true});
+  final double mapRotation; // map's current rotation (deg) — used to keep labels upright
+  const _VehicleMarker({required this.device, required this.state, required this.heading, required this.pulse, this.showName = true, this.mapRotation = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -635,11 +644,12 @@ class _VehicleMarker extends StatelessWidget {
                 ),
               ),
             ),
-          // vehicle pic (rotated by heading) — centered
+          // vehicle pic — rotated by heading, adjusted for map rotation so it
+          // always points the correct way even when the map is turned
           Positioned(
             top: 28,
             child: Transform.rotate(
-              angle: heading * 3.14159265 / 180.0,
+              angle: (heading - mapRotation) * 3.14159265 / 180.0,
               child: SizedBox(width: 46, height: 46, child: vehicleThumb(u['icon_url'], size: 46)),
             ),
           ),
