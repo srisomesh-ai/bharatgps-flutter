@@ -36,7 +36,9 @@ class NotificationService {
   static const alertTypes = <String, String>{
     'overspeed': 'Over Speed',
     'move_duration': 'Movement',
-    'ignition_duration': 'Engine On/Off',
+    'engine_on': 'Engine ON',
+    'engine_off': 'Engine OFF',
+    'offline': 'Offline',
     'powercut': 'GPS Power Cut',
     'lowbattery': 'Low Battery',
   };
@@ -233,8 +235,11 @@ class NotificationService {
   static String? _guessAlertType(String msg) {
     final m = msg.toLowerCase();
     if (m.contains('speed')) return 'overspeed';
+    if (m.contains('offline') || m.contains('lost connection') || m.contains('no signal')) return 'offline';
+    if (m.contains('engine on') || (m.contains('ignition') && m.contains('on'))) return 'engine_on';
+    if (m.contains('engine off') || (m.contains('ignition') && m.contains('off'))) return 'engine_off';
+    if (m.contains('ignition') || m.contains('engine')) return 'engine_on';
     if (m.contains('move') || m.contains('motion')) return 'move_duration';
-    if (m.contains('ignition') || m.contains('engine')) return 'ignition_duration';
     if (m.contains('power') || m.contains('unplug')) return 'powercut';
     if (m.contains('battery')) return 'lowbattery';
     return null;
