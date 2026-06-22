@@ -16,6 +16,9 @@ class MainShell extends StatefulWidget {
   // lets any screen switch tab: MainShell.of(context)?.goTo(2)
   static _MainShellState? of(BuildContext context) => context.findAncestorStateOfType<_MainShellState>();
 
+  // a vehicle id the map should focus on when it next becomes visible
+  static final ValueNotifier<dynamic> mapFocusId = ValueNotifier<dynamic>(null);
+
   @override
   State<MainShell> createState() => _MainShellState();
 }
@@ -35,6 +38,13 @@ class _MainShellState extends State<MainShell> {
   void goTo(int i) {
     if (i == _index) return;
     setState(() => _index = i);
+  }
+
+  // switch to the Map tab and tell it which vehicle to focus
+  void focusVehicleOnMap(dynamic deviceId) {
+    MainShell.mapFocusId.value = null; // reset so the same id re-fires
+    MainShell.mapFocusId.value = deviceId;
+    setState(() => _index = 2);
   }
 
   @override
