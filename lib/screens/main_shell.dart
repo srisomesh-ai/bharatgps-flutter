@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
-import '../services/voice_commands.dart';
 import 'dashboard_screen.dart';
 import 'activity_screen.dart';
 import 'map_screen.dart';
@@ -73,45 +72,7 @@ class _MainShellState extends State<MainShell> {
       child: Scaffold(
         body: IndexedStack(index: _index, children: _pages),
         bottomNavigationBar: _BottomBar(current: _index, onTap: goTo),
-        floatingActionButton: Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: FloatingActionButton(
-            heroTag: 'voiceMic',
-            backgroundColor: _listening ? AppColors.red : AppColors.teal,
-            onPressed: _onMicTap,
-            child: Icon(_listening ? Icons.mic : Icons.mic_none, color: Colors.white),
-          ),
-        ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       ),
-    );
-  }
-
-  bool _listening = false;
-
-  Future<void> _onMicTap() async {
-    if (_listening) {
-      await VoiceCommands.stop();
-      setState(() => _listening = false);
-      return;
-    }
-    setState(() => _listening = true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🎙️ Listening… say a command'), duration: Duration(seconds: 2)),
-    );
-    await VoiceCommands.listen(
-      onResult: (text) {
-        final action = VoiceCommands.parse(text);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('"$text" → ${action.feedback}'), duration: const Duration(seconds: 2)),
-          );
-        }
-        VoiceCommands.execute(context, action);
-      },
-      onDone: () {
-        if (mounted) setState(() => _listening = false);
-      },
     );
   }
 }
