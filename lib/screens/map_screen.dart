@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -1029,19 +1030,54 @@ class _PlaybackPicker extends StatelessWidget {
         const SizedBox(height: 16),
         const Text('SELECT PERIOD', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink2, letterSpacing: 0.4)),
         const SizedBox(height: 10),
-        Wrap(spacing: 8, runSpacing: 8, children: presets.entries.map((e) {
-          return GestureDetector(
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => HistoryMapScreen(device: device, days: e.value)));
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          ...presets.entries.map((e) {
+            return GestureDetector(
+              onTap: () {
+                Haptics.select();
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => HistoryMapScreen(device: device, days: e.value)));
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E9E8), width: 1.6)),
+                child: Text(e.key, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.ink)),
+              ),
+            );
+          }),
+          // Custom date range
+          GestureDetector(
+            onTap: () async {
+              Haptics.select();
+              final now = DateTime.now();
+              final range = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(now.year - 1),
+                lastDate: now,
+                initialDateRange: DateTimeRange(start: now.subtract(const Duration(days: 1)), end: now),
+                builder: (ctx, child) => Theme(
+                  data: Theme.of(ctx).copyWith(colorScheme: const ColorScheme.light(primary: AppColors.teal)),
+                  child: child!,
+                ),
+              );
+              if (range != null && context.mounted) {
+                final from = DateTime(range.start.year, range.start.month, range.start.day, 0, 0, 0);
+                final to = DateTime(range.end.year, range.end.month, range.end.day, 23, 59, 59);
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => HistoryMapScreen(device: device, from: from, to: to)));
+              }
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E9E8), width: 1.6)),
-              child: Text(e.key, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.ink)),
+              decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.08), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.teal, width: 1.6)),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.date_range, size: 16, color: AppColors.teal),
+                SizedBox(width: 6),
+                Text('Custom Range', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.teal)),
+              ]),
             ),
-          );
-        }).toList()),
+          ),
+        ]),
       ]),
     );
   }
@@ -1094,15 +1130,29 @@ class _ShareSheetState extends State<_ShareSheet> {
         'Valid until $validTill. No login required.\n\n'
         '— Powered by BharatGPS 🛰\n'
         'Get yours at http://bharatgps.store';
-    // open WhatsApp with the message
-    final waUrl = 'https://wa.me/?text=${Uri.encodeComponent(msg)}';
+    // open WhatsApp with the message — try app scheme, then wa.me web fallback
+    final encoded = Uri.encodeComponent(msg);
+    final messenger = ScaffoldMessenger.of(context);
     Navigator.pop(context);
-    try {
-      await launchUrl(Uri.parse(waUrl), mode: LaunchMode.externalApplication);
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open WhatsApp')));
-      }
+    final targets = [
+      'whatsapp://send?text=$encoded',
+      'https://wa.me/?text=$encoded',
+      'https://api.whatsapp.com/send?text=$encoded',
+    ];
+    bool opened = false;
+    for (final t in targets) {
+      try {
+        final uri = Uri.parse(t);
+        if (await canLaunchUrl(uri)) {
+          opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+          if (opened) break;
+        }
+      } catch (_) {}
+    }
+    if (!opened) {
+      // last resort: copy link so the user can paste it anywhere
+      await Clipboard.setData(ClipboardData(text: msg));
+      messenger.showSnackBar(const SnackBar(content: Text('WhatsApp not found — message copied to clipboard')));
     }
   }
 
