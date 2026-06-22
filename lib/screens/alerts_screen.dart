@@ -530,10 +530,14 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
                         if (s.file != 'default')
                           GestureDetector(
                             onTap: () async {
-                              await NotificationService.preview(s);
+                              final err = await NotificationService.preview(s);
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Playing "${s.label}"'), duration: const Duration(seconds: 1)),
+                                  SnackBar(
+                                    content: Text(err ?? 'Playing "${s.label}"'),
+                                    duration: Duration(seconds: err != null ? 4 : 1),
+                                    backgroundColor: err != null ? AppColors.red : null,
+                                  ),
                                 );
                               }
                             },
