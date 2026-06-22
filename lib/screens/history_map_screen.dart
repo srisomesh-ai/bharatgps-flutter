@@ -107,9 +107,10 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
               options: const MapOptions(initialCenter: LatLng(20.59, 78.96), initialZoom: 5),
               children: [
                 TileLayer(
-                  urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                  subdomains: const ['a', 'b', 'c', 'd'],
+                  urlTemplate: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=en',
+                  subdomains: const ['0', '1', '2', '3'],
                   userAgentPackageName: 'com.bharatgps.app',
+                  maxZoom: 20,
                 ),
                 if (_points.length > 1)
                   PolylineLayer(polylines: [
