@@ -50,10 +50,29 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     super.initState();
     // Map is LIVE — always load fresh (don't seed from cache). Stale cached
     // position/heading/tail would mislead the user into thinking it's current.
+    // seed focus from any pending request (e.g. tapped from dashboard)
+    _focusId = MainShell.mapFocusId.value;
+    MainShell.mapFocusId.addListener(_onFocusRequested);
     _load();
     _loadGprs();
     _refresh = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
     _ticker = createTicker(_onTick)..start();
+  }
+
+  void _onFocusRequested() {
+    final id = MainShell.mapFocusId.value;
+    if (id == null) return;
+    _focusId = id;
+    // focus immediately if we already have the device loaded
+    final u = _devices.firstWhere((e) => '${e['id']}' == '$id', orElse: () => {});
+    if (u.isNotEmpty && u['lat'] != null) {
+      _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 15);
+      setState(() => _selected = u);
+      _focusId = null;
+      MainShell.mapFocusId.value = null;
+    } else {
+      _load(); // not loaded yet — fetch then the focus block in _load handles + clears it
+    }
   }
 
   void _onTick(Duration elapsed) {
@@ -96,6 +115,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    MainShell.mapFocusId.removeListener(_onFocusRequested);
     _refresh?.cancel();
     _ticker?.dispose();
     super.dispose();
@@ -143,6 +163,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 15);
         setState(() => _selected = u);
       }
+      _focusId = null;
+      MainShell.mapFocusId.value = null;
     }
   }
 
