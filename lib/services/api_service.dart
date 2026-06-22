@@ -134,6 +134,7 @@ class ApiService {
         dd['subscription_expiration'], d['subscription_expiration'],
         dd['sim_expiration_date'], d['sim_expiration_date'],
       ]) ?? _scanExpiry(dd) ?? _scanExpiry(d),
+      'expiry_raw': 'dd.exp=${dd['expiration_date']} | top.exp=${d['expiration_date']} | sim=${dd['sim_expiration_date']}',
       'tail': (d['tail'] is List)
           ? (d['tail'] as List)
               .where((p) => p is Map && p['lat'] != null && p['lng'] != null)
