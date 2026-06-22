@@ -69,7 +69,10 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
   static const _typeMeta = {
     'overspeed': {'name': 'Over Speed Alert', 'icon': Icons.speed, 'color': AppColors.red, 'bg': AppColors.redBg},
     'move_duration': {'name': 'Movement Alert', 'icon': Icons.trending_flat, 'color': AppColors.blue, 'bg': AppColors.blueBg},
+    'engine_on': {'name': 'Engine ON Alert', 'icon': Icons.power_settings_new, 'color': AppColors.green, 'bg': AppColors.greenBg},
+    'engine_off': {'name': 'Engine OFF Alert', 'icon': Icons.power_off, 'color': AppColors.ink2, 'bg': AppColors.bg},
     'ignition_duration': {'name': 'Engine On/Off Alert', 'icon': Icons.power_settings_new, 'color': AppColors.green, 'bg': AppColors.greenBg},
+    'offline': {'name': 'Offline Alert', 'icon': Icons.wifi_off, 'color': AppColors.red, 'bg': AppColors.redBg},
     'powercut': {'name': 'GPS Power Cut Alert', 'icon': Icons.flash_on, 'color': AppColors.orange, 'bg': AppColors.orangeBg},
     'lowbattery': {'name': 'Low Battery Alert', 'icon': Icons.battery_alert, 'color': AppColors.violet, 'bg': AppColors.violetBg},
   };
@@ -348,7 +351,9 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
   static const _types = [
     {'t': 'overspeed', 'name': 'Over Speed', 'sub': 'Speed limit', 'icon': Icons.speed, 'color': AppColors.red, 'bg': AppColors.redBg},
     {'t': 'move_duration', 'name': 'Movement', 'sub': 'Moves when parked', 'icon': Icons.trending_flat, 'color': AppColors.blue, 'bg': AppColors.blueBg},
-    {'t': 'ignition_duration', 'name': 'Engine On/Off', 'sub': 'Ignition', 'icon': Icons.power_settings_new, 'color': AppColors.green, 'bg': AppColors.greenBg},
+    {'t': 'engine_on', 'name': 'Engine ON', 'sub': 'Ignition turned on', 'icon': Icons.power_settings_new, 'color': AppColors.green, 'bg': AppColors.greenBg},
+    {'t': 'engine_off', 'name': 'Engine OFF', 'sub': 'Ignition turned off', 'icon': Icons.power_off, 'color': AppColors.ink2, 'bg': AppColors.bg},
+    {'t': 'offline', 'name': 'Offline', 'sub': 'Device stops reporting', 'icon': Icons.wifi_off, 'color': AppColors.red, 'bg': AppColors.redBg},
     {'t': 'powercut', 'name': 'Power Cut', 'sub': 'GPS unplugged', 'icon': Icons.flash_on, 'color': AppColors.orange, 'bg': AppColors.orangeBg},
     {'t': 'lowbattery', 'name': 'Low Battery', 'sub': 'Below threshold', 'icon': Icons.battery_alert, 'color': AppColors.violet, 'bg': AppColors.violetBg},
   ];
@@ -361,6 +366,8 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
         return 'Trigger after (minutes)';
       case 'ignition_duration':
         return 'Trigger after (minutes)';
+      case 'offline':
+        return 'Offline for (minutes)';
       case 'lowbattery':
         return 'Battery below';
       default:
@@ -369,7 +376,8 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
   }
 
   String get _thrUnit => _type == 'overspeed' ? 'km/h' : (_type == 'lowbattery' ? '%' : 'min');
-  bool get _hasThreshold => _type != 'powercut';
+  // engine on/off and power cut are event-based — no threshold needed
+  bool get _hasThreshold => _type != 'powercut' && _type != 'engine_on' && _type != 'engine_off';
 
   Future<void> _create() async {
     if (_selected.isEmpty) {
@@ -384,7 +392,7 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
       name: '${meta['name']} Alert',
       devices: _selected.map((e) => int.parse(e)).toList(),
       overspeed: _type == 'overspeed' ? thr : null,
-      moveDuration: _type == 'move_duration' ? thr : null,
+      moveDuration: _type == 'move_duration' ? thr : (_type == 'offline' ? thr : null),
       ignitionDuration: _type == 'ignition_duration' ? thr : null,
     );
     if (!mounted) return;
