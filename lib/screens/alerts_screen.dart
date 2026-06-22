@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
@@ -528,8 +529,8 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
                         const SizedBox(width: 11),
                         Expanded(child: Text(s.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
                         if (s.file != 'default')
-                          GestureDetector(
-                            onTap: () async {
+                          _PlayButton(
+                            onPlay: () async {
                               final err = await NotificationService.preview(s);
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -541,15 +542,6 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
                                 );
                               }
                             },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                              decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(20)),
-                              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                                Icon(Icons.play_arrow, size: 15, color: AppColors.teal),
-                                SizedBox(width: 3),
-                                Text('Play', style: TextStyle(fontSize: 11, color: AppColors.teal, fontWeight: FontWeight.w700)),
-                              ]),
-                            ),
                           ),
                       ]),
                     ),
@@ -606,6 +598,50 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
           ),
         ),
       ]),
+    );
+  }
+}
+
+// Special Play button: teal by default, turns white (filled) while pressed,
+// with haptic feedback so the user feels the press.
+class _PlayButton extends StatefulWidget {
+  final Future<void> Function() onPlay;
+  const _PlayButton({required this.onPlay});
+  @override
+  State<_PlayButton> createState() => _PlayButtonState();
+}
+
+class _PlayButtonState extends State<_PlayButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final pressed = _pressed;
+    return GestureDetector(
+      onTapDown: (_) {
+        setState(() => _pressed = true);
+        HapticFeedback.mediumImpact(); // feel the press
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      onTapUp: (_) async {
+        setState(() => _pressed = false);
+        await widget.onPlay();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+        decoration: BoxDecoration(
+          color: pressed ? Colors.white : AppColors.teal,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.teal, width: 1.4),
+          boxShadow: pressed ? null : const [BoxShadow(color: Color(0x330E5C5C), blurRadius: 6, offset: Offset(0, 2))],
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.play_arrow, size: 16, color: pressed ? AppColors.teal : Colors.white),
+          const SizedBox(width: 3),
+          Text('Play', style: TextStyle(fontSize: 11.5, color: pressed ? AppColors.teal : Colors.white, fontWeight: FontWeight.w800)),
+        ]),
+      ),
     );
   }
 }
