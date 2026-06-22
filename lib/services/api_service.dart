@@ -398,9 +398,29 @@ class ApiService {
     final out = <String>[];
     if (res.statusCode == 200) {
       final j = jsonDecode(res.body);
-      if (j is Map && j['devices_gprs'] is List) {
-        for (final d in j['devices_gprs']) {
-          if (d is Map && d['id'] != null) out.add(d['id'].toString());
+      if (j is Map) {
+        // protocol per device, and which commands each protocol supports
+        final protocols = (j['devices_protocols'] is Map) ? Map<String, dynamic>.from(j['devices_protocols']) : {};
+        final commandsAll = (j['commands_all'] is Map) ? Map<String, dynamic>.from(j['commands_all']) : {};
+
+        bool protoSupportsCut(String proto) {
+          final cmds = commandsAll[proto];
+          if (cmds is Map) return cmds.containsKey('engineStop');
+          if (cmds is List) return cmds.any((c) => (c is Map ? c['id'] : c).toString() == 'engineStop');
+          return false;
+        }
+
+        if (j['devices_gprs'] is List) {
+          for (final d in j['devices_gprs']) {
+            if (d is Map && d['id'] != null) {
+              final id = d['id'].toString();
+              final proto = '${protocols[id] ?? ''}';
+              // Only count the device if its protocol truly supports engineStop.
+              // Fall back to 'default' protocol's capability if proto unknown.
+              final ok = proto.isNotEmpty ? protoSupportsCut(proto) : protoSupportsCut('default');
+              if (ok) out.add(id);
+            }
+          }
         }
       }
     }
