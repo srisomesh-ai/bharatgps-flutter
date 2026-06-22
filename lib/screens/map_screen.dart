@@ -466,9 +466,21 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     }
                   }),
                   const SizedBox(height: 12),
-                  _mapCtrl(Icons.layers_outlined, () => setState(() {
-                        _mapType = _mapType == 'normal' ? 'satellite' : (_mapType == 'satellite' ? 'hybrid' : 'normal');
-                      })),
+                  // SHARE this vehicle's live tracking (replaces duplicate layers toggle)
+                  _mapCtrl(Icons.share, () {
+                    Haptics.medium();
+                    final u = _selected ?? (_visibleDevices(needLatLng: true).isNotEmpty ? _visibleDevices(needLatLng: true).first : null);
+                    if (u == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No vehicle to share')));
+                      return;
+                    }
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => _ShareSheet(device: u),
+                    );
+                  }),
                   const SizedBox(height: 12),
                   // show/hide vehicle names
                   _mapCtrl(_showNames ? Icons.label : Icons.label_off, () => setState(() => _showNames = !_showNames)),
@@ -1029,6 +1041,133 @@ class _PlaybackPicker extends StatelessWidget {
             ),
           );
         }).toList()),
+      ]),
+    );
+  }
+}
+
+// ===== Share live tracking link (with expiry) via WhatsApp =====
+class _ShareSheet extends StatefulWidget {
+  final Map<String, dynamic> device;
+  const _ShareSheet({required this.device});
+  @override
+  State<_ShareSheet> createState() => _ShareSheetState();
+}
+
+class _ShareSheetState extends State<_ShareSheet> {
+  // duration presets in hours
+  static const _options = [
+    {'label': '1 Hour', 'hours': 1},
+    {'label': '4 Hours', 'hours': 4},
+    {'label': '8 Hours', 'hours': 8},
+    {'label': '1 Day', 'hours': 24},
+    {'label': '3 Days', 'hours': 72},
+    {'label': '1 Week', 'hours': 168},
+  ];
+  int _hours = 4;
+  bool _creating = false;
+
+  Future<void> _shareNow() async {
+    Haptics.medium();
+    setState(() => _creating = true);
+    final expiresAt = DateTime.now().add(Duration(hours: _hours));
+    final name = 'Shared · ${widget.device['name'] ?? 'Vehicle'}';
+    final res = await ApiService.createSharing(
+      devices: [int.tryParse('${widget.device['id']}') ?? 0],
+      name: name,
+      expiresAt: expiresAt,
+    );
+    if (!mounted) return;
+    setState(() => _creating = false);
+    if (res == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Could not create share link. Sharing may not be enabled on your account.'),
+      ));
+      return;
+    }
+    final link = res['url'] as String;
+    final validTill = _fmtExpiry(expiresAt);
+    final vname = widget.device['name'] ?? 'Vehicle';
+    final msg = '📍 Live location of my vehicle "$vname" via BharatGPS Tracker:\n'
+        '$link\n\n'
+        'Valid until $validTill. No login required.\n\n'
+        '— Powered by BharatGPS 🛰\n'
+        'Get yours at http://bharatgps.store';
+    // open WhatsApp with the message
+    final waUrl = 'https://wa.me/?text=${Uri.encodeComponent(msg)}';
+    Navigator.pop(context);
+    try {
+      await launchUrl(Uri.parse(waUrl), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open WhatsApp')));
+      }
+    }
+  }
+
+  String _fmtExpiry(DateTime d) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    final h = d.hour > 12 ? d.hour - 12 : (d.hour == 0 ? 12 : d.hour);
+    final ap = d.hour >= 12 ? 'PM' : 'AM';
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${d.day} ${months[d.month - 1]}, ${two(h)}:${two(d.minute)} $ap';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      padding: EdgeInsets.fromLTRB(20, 14, 20, 20 + MediaQuery.of(context).padding.bottom),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Center(child: Container(width: 38, height: 5, margin: const EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: const Color(0xFFE2E9E8), borderRadius: BorderRadius.circular(3)))),
+        Row(children: [
+          Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.12), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.share, color: AppColors.teal, size: 21)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Share Live Tracking', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w800)),
+            Text(widget.device['name'] ?? 'Vehicle', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: AppColors.ink2)),
+          ])),
+        ]),
+        const SizedBox(height: 16),
+        const Text('SHARE FOR', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink2, letterSpacing: 0.4)),
+        const SizedBox(height: 10),
+        Wrap(spacing: 9, runSpacing: 9, children: _options.map((o) {
+          final sel = _hours == o['hours'];
+          return GestureDetector(
+            onTap: () { Haptics.select(); setState(() => _hours = o['hours'] as int); },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+              decoration: BoxDecoration(
+                color: sel ? AppColors.teal : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: sel ? AppColors.teal : AppColors.line, width: 1.3),
+              ),
+              child: Text(o['label'] as String, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: sel ? Colors.white : AppColors.ink2)),
+            ),
+          );
+        }).toList()),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: const Color(0xFFF1F8F7), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFD6EBE8))),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.info_outline, size: 16, color: AppColors.teal),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Anyone with the link can track this vehicle without login until it expires (${_fmtExpiry(DateTime.now().add(Duration(hours: _hours)))}).', style: const TextStyle(fontSize: 11.5, color: AppColors.ink2, height: 1.35))),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _creating ? null : _shareNow,
+            icon: _creating
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.send, size: 18),
+            label: Text(_creating ? 'Creating link…' : 'Share on WhatsApp'),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
+          ),
+        ),
       ]),
     );
   }
