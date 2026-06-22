@@ -115,6 +115,7 @@ class ApiService {
 
     return {
       'id': d['id'],
+      'traccar_id': tr['id'] ?? dd['traccar_device_id'],
       'name': d['name'] ?? 'Vehicle',
       'online': d['online'],
       'speed': d['speed'] ?? 0,
