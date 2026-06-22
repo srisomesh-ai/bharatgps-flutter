@@ -122,7 +122,6 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
               )
             : const SizedBox.shrink(),
       ),
-      bottomNavigationBar: const BottomNav(current: 3),
     );
   }
 
