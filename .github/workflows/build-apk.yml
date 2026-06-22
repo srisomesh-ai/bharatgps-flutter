@@ -167,6 +167,11 @@ jobs:
             echo "No google-services.json — building without Firebase (notifications inactive)."
           fi
 
+      - name: Generate app launcher icons (BharatGPS logo)
+        run: |
+          flutter pub get
+          flutter pub run flutter_launcher_icons || dart run flutter_launcher_icons || true
+
       - name: Get dependencies
         run: flutter pub get
 
