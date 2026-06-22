@@ -37,7 +37,9 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
     setState(() {
       _devices = d;
       for (final u in d) {
-        _names['${u['id']}'] = u['name'] ?? 'Device ${u['id']}';
+        final nm = u['name'] ?? 'Device ${u['id']}';
+        _names['${u['id']}'] = nm;
+        if (u['traccar_id'] != null) _names['${u['traccar_id']}'] = nm; // events may use traccar id
       }
     });
   }
