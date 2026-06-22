@@ -222,23 +222,6 @@ class _TroubleshootSheetState extends State<TroubleshootSheet> with SingleTicker
             Text(_typed, style: const TextStyle(fontSize: 13, height: 1.5, color: AppColors.ink)),
           ]),
         ),
-        const SizedBox(height: 14),
-        const Text('Diagnostic Report', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.ink2)),
-        const SizedBox(height: 10),
-        ..._cards.map((c) => Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(14)),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(width: 36, height: 36, decoration: BoxDecoration(color: _cardBg(c['cls']!), borderRadius: BorderRadius.circular(10)), child: Icon(_icon(c['ic']!), color: _cardColor(c['cls']!), size: 18)),
-                const SizedBox(width: 11),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(c['title']!, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
-                  if ((c['sub'] ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: Text(c['sub']!, style: const TextStyle(fontSize: 12, color: AppColors.ink2, height: 1.35))),
-                ])),
-                if ((c['val'] ?? '').isNotEmpty) Text(c['val']!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _cardColor(c['cls']!))),
-              ]),
-            )),
       ]),
     );
   }
