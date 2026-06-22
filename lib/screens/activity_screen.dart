@@ -22,6 +22,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
   @override
   void initState() {
     super.initState();
+    if (ApiService.cachedDevices.isNotEmpty) {
+      _devices = [...ApiService.cachedDevices]..sort((a, b) => '${a['name']}'.toLowerCase().compareTo('${b['name']}'.toLowerCase()));
+      _loading = false;
+    }
     _load();
   }
 
