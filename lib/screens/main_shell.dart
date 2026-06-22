@@ -104,7 +104,7 @@ class _BottomBar extends StatelessWidget {
           final on = i == current;
           return Expanded(
             child: InkWell(
-              onTap: () => onTap(i),
+              onTap: () { Haptics.light(); onTap(i); },
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
