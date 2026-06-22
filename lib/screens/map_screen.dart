@@ -346,9 +346,20 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               Container(
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
                 child: TextField(
+                  textInputAction: TextInputAction.search,
                   onChanged: (v) => setState(() => _search = v.trim().toLowerCase()),
+                  onSubmitted: (v) {
+                    final q = v.trim().toLowerCase();
+                    if (q.isEmpty) return;
+                    final match = _devices.where((u) => (u['name'] ?? '').toString().toLowerCase().contains(q) && u['lat'] != null && u['lng'] != null);
+                    if (match.isNotEmpty) {
+                      final u = match.first;
+                      _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 16);
+                      setState(() => _selected = u);
+                    }
+                  },
                   decoration: const InputDecoration(
-                    hintText: 'Search Vehicles / Places',
+                    hintText: 'Search Vehicles',
                     hintStyle: TextStyle(color: AppColors.muted, fontSize: 14),
                     prefixIcon: Icon(Icons.search, color: AppColors.muted, size: 21),
                     border: InputBorder.none,
@@ -655,12 +666,19 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No location available for this vehicle')));
       return;
     }
-    // Google Maps directions to the vehicle's current location
-    final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Google Maps')));
+    // Try the Google Maps app first (geo/maps URL), then fall back to browser.
+    final candidates = [
+      Uri.parse('google.navigation:q=$lat,$lng'),
+      Uri.parse('geo:$lat,$lng?q=$lat,$lng(Vehicle)'),
+      Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving'),
+    ];
+    for (final url in candidates) {
+      try {
+        if (await launchUrl(url, mode: LaunchMode.externalApplication)) return;
+      } catch (_) {}
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No maps app found to open navigation')));
     }
   }
 
@@ -758,6 +776,8 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             _row(Icons.wifi, 'GPS Signal', gps, valColor: gps == 'Strong' ? AppColors.green : AppColors.red),
             const Divider(height: 1, color: AppColors.line),
             _row(Icons.event, 'Device Expiry', _expiryText(u['expiry']) ?? 'Not set', valColor: _expiryColor(u['expiry'])),
+            if (_expiryText(u['expiry']) == null && (u['expiry_raw'] ?? '').toString().isNotEmpty)
+              Padding(padding: const EdgeInsets.only(bottom: 6), child: Text('raw: ${u['expiry_raw']}', style: const TextStyle(fontSize: 9, color: AppColors.muted))),
             const SizedBox(height: 16),
             // actions: Live Track + Playback, then Reports full-width
             Row(children: [
@@ -791,7 +811,7 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
                 onPressed: () => _navigateTo(u),
                 icon: const Icon(Icons.directions, size: 18),
                 label: const Text('Navigate (Google Maps)'),
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.blue, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
               ),
             ),
             const SizedBox(height: 10),
