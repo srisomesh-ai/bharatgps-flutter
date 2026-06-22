@@ -405,6 +405,38 @@ class ApiService {
     };
   }
 
+  /// Fetch the device's real expiry date from /edit_device_data (the panel's
+  /// edit form). get_devices often returns null for expiration_date even when
+  /// the panel has a date — this endpoint loads the full editable record.
+  static Future<String?> fetchDeviceExpiry(String deviceId) async {
+    try {
+      final res = await http.get(_u(host!, 'edit_device_data', {
+        'lang': 'en',
+        'user_api_hash': hash!,
+        'device_id': deviceId,
+      })).timeout(const Duration(seconds: 20));
+      if (res.statusCode != 200) return null;
+      final j = jsonDecode(res.body);
+      if (j is! Map) return null;
+      // the device record is usually under 'item'
+      final item = (j['item'] is Map) ? Map<String, dynamic>.from(j['item']) : j;
+      final candidates = [
+        item['expiration_date'],
+        j['expiration_date'],
+        item['expires_date'],
+        item['subscription_expiration'],
+      ];
+      for (final c in candidates) {
+        if (c == null) continue;
+        final s = c.toString().trim();
+        if (s.isNotEmpty && !s.startsWith('0000') && s != 'null' && RegExp(r'\d{4}-\d{2}-\d{2}').hasMatch(s)) {
+          return s;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// ENGINE CUT-OFF — list of devices that accept GPRS commands.
   static Future<List<String>> getCommandDevices() async {
     final res = await http.get(_u(host!, 'send_command_data', {
