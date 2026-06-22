@@ -36,6 +36,50 @@ Widget _wrap(Widget anim, String label) => Center(
       ]),
     );
 
+// ===== INLINE: small road loader for buttons (a moving dot along a road) =====
+class RouteMiniLoader extends StatelessWidget {
+  final double width;
+  final double height;
+  final Color? color;
+  const RouteMiniLoader({super.key, this.width = 26, this.height = 14, this.color});
+  @override
+  Widget build(BuildContext context) {
+    return _Spin(
+      duration: const Duration(milliseconds: 1200),
+      builder: (t) => SizedBox(
+        width: width,
+        height: height,
+        child: CustomPaint(painter: _RouteMiniPainter(t, color ?? AppColors.teal)),
+      ),
+    );
+  }
+}
+
+class _RouteMiniPainter extends CustomPainter {
+  final double t;
+  final Color color;
+  _RouteMiniPainter(this.t, this.color);
+  @override
+  void paint(Canvas c, Size s) {
+    final y = s.height / 2;
+    // road base line
+    c.drawLine(Offset(2, y), Offset(s.width - 2, y),
+        Paint()..color = color.withOpacity(0.22)..strokeWidth = 3..strokeCap = StrokeCap.round);
+    // dashed centre markings (static)
+    final dash = Paint()..color = color.withOpacity(0.4)..strokeWidth = 1.4..strokeCap = StrokeCap.round;
+    for (double x = 4; x < s.width - 4; x += 7) {
+      c.drawLine(Offset(x, y), Offset(x + 3, y), dash);
+    }
+    // moving truck dot
+    final x = 2 + (s.width - 4) * t;
+    c.drawCircle(Offset(x, y), 4.2, Paint()..color = color);
+    c.drawCircle(Offset(x, y), 2.0, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(_RouteMiniPainter old) => old.t != t;
+}
+
 // ===== MAP: orbiting satellites around a globe =====
 class SatelliteLoader extends StatelessWidget {
   final String label;
