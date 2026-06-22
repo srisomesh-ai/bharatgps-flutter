@@ -264,8 +264,14 @@ class ApiService {
         final t1 = DateTime.tryParse(points[j - 1]['t'].toString().replaceFirst(' ', 'T'));
         if (t0 != null && t1 != null) {
           final secs = t1.difference(t0).inSeconds;
-          if (secs >= 180) {
-            stops.add({'lat': points[i]['lat'], 'lng': points[i]['lng'], 'mins': (secs / 60).round()});
+          if (secs >= 120) {
+            stops.add({
+              'lat': points[i]['lat'], 'lng': points[i]['lng'],
+              'mins': (secs / 60).round(),
+              'secs': secs,
+              'arrived': points[i]['t'],   // when it stopped
+              'departed': points[j - 1]['t'], // when it moved again
+            });
           }
         }
         i = j;
@@ -278,7 +284,13 @@ class ApiService {
           if (t0 != null && t1 != null) {
             final gap = t1.difference(t0).inSeconds;
             if (gap >= 600) {
-              stops.add({'lat': points[i]['lat'], 'lng': points[i]['lng'], 'mins': (gap / 60).round()});
+              stops.add({
+                'lat': points[i]['lat'], 'lng': points[i]['lng'],
+                'mins': (gap / 60).round(),
+                'secs': gap,
+                'arrived': points[i]['t'],
+                'departed': points[i + 1]['t'],
+              });
             }
           }
         }
@@ -286,10 +298,36 @@ class ApiService {
       }
     }
 
+    // ---- summary stats from the history data ----
+    int maxSpeed = 0;
+    int movingSecs = 0;
+    for (int k = 0; k < points.length; k++) {
+      final sp = points[k]['spd'] as int;
+      if (sp > maxSpeed) maxSpeed = sp;
+    }
+    // moving duration = total span minus time spent in stops
+    DateTime? firstT = points.isNotEmpty ? DateTime.tryParse(points.first['t'].toString().replaceFirst(' ', 'T')) : null;
+    DateTime? lastT = points.isNotEmpty ? DateTime.tryParse(points.last['t'].toString().replaceFirst(' ', 'T')) : null;
+    int totalSecs = (firstT != null && lastT != null) ? lastT.difference(firstT).inSeconds : 0;
+    int stoppedSecs = 0;
+    for (final s in stops) {
+      stoppedSecs += (s['secs'] as int? ?? 0);
+    }
+    movingSecs = (totalSecs - stoppedSecs).clamp(0, totalSecs);
+    // average moving speed (km/h) = distance / moving-hours
+    double avgSpeed = movingSecs > 0 ? dist / (movingSecs / 3600.0) : 0;
+
     return {
       'points': points,
       'distance_km': double.parse(dist.toStringAsFixed(2)),
       'stops': stops,
+      'max_speed': maxSpeed,
+      'avg_speed': double.parse(avgSpeed.toStringAsFixed(1)),
+      'total_secs': totalSecs,
+      'moving_secs': movingSecs,
+      'stopped_secs': stoppedSecs,
+      'first_time': points.isNotEmpty ? points.first['t'] : null,
+      'last_time': points.isNotEmpty ? points.last['t'] : null,
     };
   }
 
