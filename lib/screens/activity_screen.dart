@@ -131,7 +131,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   ),
           ),
         ]),
-      bottomNavigationBar: const BottomNav(current: 1),
     );
   }
 
