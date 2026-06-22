@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'api_service.dart';
@@ -179,19 +180,38 @@ class NotificationService {
     );
   }
 
-  /// Preview a sound immediately (used by the settings screen play button).
+  /// Preview a sound immediately — plays the audio file directly (reliable,
+  /// audible, works regardless of notification/channel state).
+  static final AudioPlayer _previewPlayer = AudioPlayer();
   static Future<void> preview(AlertSound s) async {
-    await _ensureChannel(s);
-    final details = AndroidNotificationDetails(
-      'bgps_alerts_${s.id}',
-      'Alerts — ${s.label}',
-      importance: Importance.high,
-      priority: Priority.high,
-      playSound: true,
-      sound: s.file == 'default' ? null : RawResourceAndroidNotificationSound(s.file),
-      icon: '@mipmap/ic_launcher',
-    );
-    await _fln.show(99999, 'Sound preview', '${s.label} alert tone', NotificationDetails(android: details));
+    if (s.file == 'default') {
+      // play a short notification via the system default
+      await _ensureChannel(s);
+      await _fln.show(99999, 'Sound preview', 'Default notification tone',
+          NotificationDetails(android: AndroidNotificationDetails(
+            'bgps_alerts_default', 'Alerts — Default',
+            importance: Importance.high, priority: Priority.high, playSound: true,
+            icon: '@mipmap/ic_launcher',
+          )));
+      return;
+    }
+    try {
+      await _previewPlayer.stop();
+      // play the raw resource directly: android.resource://<package>/raw/<file>
+      await _previewPlayer.play(
+        UrlSource('android.resource://com.bharatgps.bharatgps_app/raw/${s.file}'),
+      );
+    } catch (_) {
+      // fallback: try notification-based preview
+      await _ensureChannel(s);
+      await _fln.show(99999, 'Sound preview', '${s.label} alert tone',
+          NotificationDetails(android: AndroidNotificationDetails(
+            'bgps_alerts_${s.id}', 'Alerts — ${s.label}',
+            importance: Importance.high, priority: Priority.high, playSound: true,
+            sound: RawResourceAndroidNotificationSound(s.file),
+            icon: '@mipmap/ic_launcher',
+          )));
+    }
   }
 
   /// Send the FCM token + chosen sound to the backend relay so it can push to this device.
