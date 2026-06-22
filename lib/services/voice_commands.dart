@@ -45,7 +45,7 @@ class VoiceCommands {
       listenFor: const Duration(seconds: 6),
       pauseFor: const Duration(seconds: 3),
       localeId: 'en_IN',
-      cancelOnError: true,
+      listenOptions: SpeechListenOptions(cancelOnError: true, partialResults: false),
     );
     // poll for completion
     _speech.statusListener = (status) {
