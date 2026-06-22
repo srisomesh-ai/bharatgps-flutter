@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'main_shell.dart';
 import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
 
@@ -83,7 +84,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Row(children: [
               const Text('Profile', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800)),
               const Spacer(),
-              IconButton(onPressed: () => Navigator.pushReplacementNamed(context, '/alerts'), icon: const Icon(Icons.notifications_none, color: Colors.white), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+              IconButton(onPressed: () => MainShell.of(context)?.goTo(3), icon: const Icon(Icons.notifications_none, color: Colors.white), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
               const SizedBox(width: 14),
               IconButton(onPressed: () => _soon('Settings'), icon: const Icon(Icons.settings_outlined, color: Colors.white), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
             ]),
@@ -171,7 +172,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ]),
-      bottomNavigationBar: const BottomNav(current: 4),
     );
   }
 
