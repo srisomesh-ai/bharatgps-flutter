@@ -79,6 +79,9 @@ class ApiService {
   }
 
   /// DEVICES — flattened list.
+  // last successful device list — lets screens render instantly while refreshing
+  static List<Map<String, dynamic>> cachedDevices = [];
+
   static Future<List<Map<String, dynamic>>> getDevices() async {
     final res = await http.get(_u(host!, 'get_devices', {
       'lang': 'en',
@@ -97,6 +100,7 @@ class ApiService {
         }
       }
     }
+    if (out.isNotEmpty) cachedDevices = out;
     return out;
   }
 
