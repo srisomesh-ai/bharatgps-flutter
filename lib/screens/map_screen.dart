@@ -405,8 +405,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   onTap: (_, __) => setState(() => _selected = null),
                   onPositionChanged: (camera, _) {
                     // keep marker labels upright as the map rotates
-                    if ((camera.rotation - _mapRotation).abs() > 0.5) {
-                      setState(() => _mapRotation = camera.rotation);
+                    final rot = _map.camera.rotation;
+                    if ((rot - _mapRotation).abs() > 0.5) {
+                      setState(() => _mapRotation = rot);
                     }
                   },
                 ),
