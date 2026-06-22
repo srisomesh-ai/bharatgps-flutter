@@ -770,11 +770,18 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             ]),
             const SizedBox(height: 16),
             // 2 tiles
-            Row(children: [
-              _tile('${s == 'of' ? '—' : (u['speed'] ?? 0)}', 'km/h'),
-              const SizedBox(width: 9),
-              _tile(s == 'rn' ? 'ON' : (s == 'id' ? 'IDLE' : 'OFF'), 'Engine', color: s == 'rn' ? AppColors.green : (s == 'of' ? AppColors.red : AppColors.orange)),
-            ]),
+            Builder(builder: (_) {
+              final ign = tBool((u['ts'] ?? {})['ignition']); // real engine status from device
+              final engineOn = ign == true;
+              final engineKnown = ign != null;
+              final engineLabel = !engineKnown ? (s == 'rn' ? 'ON' : (s == 'of' ? 'OFF' : '—')) : (engineOn ? 'ON' : 'OFF');
+              final engineColor = !engineKnown ? (s == 'rn' ? AppColors.green : (s == 'of' ? AppColors.red : AppColors.orange)) : (engineOn ? AppColors.green : AppColors.red);
+              return Row(children: [
+                _tile('${s == 'of' ? '—' : (u['speed'] ?? 0)}', 'km/h'),
+                const SizedBox(width: 9),
+                _tile(engineLabel, 'Engine', color: engineColor),
+              ]);
+            }),
             const SizedBox(height: 14),
             // address bar
             Container(
