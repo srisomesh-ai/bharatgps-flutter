@@ -18,6 +18,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    if (ApiService.cachedDevices.isNotEmpty) {
+      _devices = ApiService.cachedDevices;
+      _loading = false;
+    }
     _load();
   }
 
