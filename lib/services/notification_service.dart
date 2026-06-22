@@ -17,7 +17,8 @@ class AlertSound {
   final String label;
   final String file; // raw resource name, or 'default'
   final String category; // 'Default' | 'English' | 'Hindi' | 'Telugu' | 'Other Tones'
-  const AlertSound(this.id, this.label, this.file, [this.category = 'Other Tones']);
+  final String ext; // file extension: 'mp3' or 'wav'
+  const AlertSound(this.id, this.label, this.file, [this.category = 'Other Tones', this.ext = 'mp3']);
 }
 
 // Sound categories shown when creating an alert.
@@ -27,26 +28,26 @@ const kAlertSounds = <AlertSound>[
   // Default = phone's default notification sound (no file needed)
   AlertSound('default', 'Default Notification', 'default', 'Default'),
 
-  // English voice audios
-  AlertSound('en_engon', 'Engine On', 'en_engon', 'English'),
-  AlertSound('en_engoff', 'Engine Off', 'en_engoff', 'English'),
-  AlertSound('en_speed', 'Speed', 'en_speed', 'English'),
-  AlertSound('en_online', 'Online', 'en_online', 'English'),
-  AlertSound('en_offline', 'Offline', 'en_offline', 'English'),
+  // English voice audios (.wav)
+  AlertSound('en_engon', 'Engine On', 'en_engon', 'English', 'wav'),
+  AlertSound('en_engoff', 'Engine Off', 'en_engoff', 'English', 'wav'),
+  AlertSound('en_speed', 'Speed', 'en_speed', 'English', 'wav'),
+  AlertSound('en_online', 'Online', 'en_online', 'English', 'wav'),
+  AlertSound('en_offline', 'Offline', 'en_offline', 'English', 'wav'),
 
-  // Hindi voice audios
-  AlertSound('hi_eng_on', 'Engine On', 'hi_eng_on', 'Hindi'),
-  AlertSound('hi_eng_off', 'Engine Off', 'hi_eng_off', 'Hindi'),
-  AlertSound('hi_speed', 'Speed', 'hi_speed', 'Hindi'),
-  AlertSound('hi_online', 'Online', 'hi_online', 'Hindi'),
-  AlertSound('hi_offline', 'Offline', 'hi_offline', 'Hindi'),
+  // Hindi voice audios (.wav)
+  AlertSound('hi_eng_on', 'Engine On', 'hi_eng_on', 'Hindi', 'wav'),
+  AlertSound('hi_eng_off', 'Engine Off', 'hi_eng_off', 'Hindi', 'wav'),
+  AlertSound('hi_speed', 'Speed', 'hi_speed', 'Hindi', 'wav'),
+  AlertSound('hi_online', 'Online', 'hi_online', 'Hindi', 'wav'),
+  AlertSound('hi_offline', 'Offline', 'hi_offline', 'Hindi', 'wav'),
 
-  // Telugu voice audios
-  AlertSound('te_engon', 'Engine On', 'te_engon', 'Telugu'),
-  AlertSound('te_engoff', 'Engine Off', 'te_engoff', 'Telugu'),
-  AlertSound('te_speed', 'Speed', 'te_speed', 'Telugu'),
-  AlertSound('te_online', 'Online', 'te_online', 'Telugu'),
-  AlertSound('te_offline', 'Offline', 'te_offline', 'Telugu'),
+  // Telugu voice audios (.wav)
+  AlertSound('te_engon', 'Engine On', 'te_engon', 'Telugu', 'wav'),
+  AlertSound('te_engoff', 'Engine Off', 'te_engoff', 'Telugu', 'wav'),
+  AlertSound('te_speed', 'Speed', 'te_speed', 'Telugu', 'wav'),
+  AlertSound('te_online', 'Online', 'te_online', 'Telugu', 'wav'),
+  AlertSound('te_offline', 'Offline', 'te_offline', 'Telugu', 'wav'),
 
   // Other tones
   AlertSound('siren', 'Siren', 'siren', 'Other Tones'),
@@ -198,7 +199,7 @@ class NotificationService {
       await _previewPlayer.stop();
       await _previewPlayer.setReleaseMode(ReleaseMode.stop);
       // play from bundled assets: assets/sounds/<file>.mp3
-      await _previewPlayer.play(AssetSource('sounds/${s.file}.mp3'));
+      await _previewPlayer.play(AssetSource('sounds/${s.file}.${s.ext}'));
       return null;
     } catch (e) {
       return 'Preview failed: $e';
