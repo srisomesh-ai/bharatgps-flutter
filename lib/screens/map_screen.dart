@@ -309,7 +309,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         point: pos,
         width: 200,
         height: 96,
-        rotate: true, // keep the marker upright when the map is rotated (labels stay readable)
+        // marker rotates with the map; we counter-rotate the text labels below
+        // so the icon stays glued to the road direction while name/status stay upright
         child: GestureDetector(
           onTap: () {
             setState(() => _selected = u);
@@ -644,39 +645,45 @@ class _VehicleMarker extends StatelessWidget {
                 decoration: BoxDecoration(color: AppColors.green.withOpacity((1 - pulse) * 0.35), shape: BoxShape.circle),
               ),
             ),
-          // plate label above (centered, full width available so it never clips)
+          // plate label above — counter-rotated so it stays upright when map rotates
           if (showName)
             Positioned(
               top: 0,
               left: 0,
               right: 0,
               child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x2E000000), blurRadius: 8)]),
-                  child: Text(u['name'] ?? 'Vehicle', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                child: Transform.rotate(
+                  angle: -mapRotation * 3.14159265 / 180.0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x2E000000), blurRadius: 8)]),
+                    child: Text(u['name'] ?? 'Vehicle', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                  ),
                 ),
               ),
             ),
-          // vehicle pic — rotated by heading, adjusted for map rotation so it
-          // always points the correct way even when the map is turned
+          // vehicle pic — rotates with the map (marker rotates), so just heading
+          // keeps it glued to the actual travel direction on the road
           Positioned(
             top: 28,
             child: Transform.rotate(
-              angle: (heading - mapRotation) * 3.14159265 / 180.0,
+              angle: heading * 3.14159265 / 180.0,
               child: SizedBox(width: 46, height: 46, child: vehicleThumb(u['icon_url'], size: 46)),
             ),
           ),
-          // status tag below
+          // status tag below — counter-rotated so it stays upright when map rotates
           Positioned(
             bottom: 4,
             left: 0,
             right: 0,
             child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
-                decoration: BoxDecoration(color: stateColor(s), borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6)]),
-                child: Text(tagText, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+              child: Transform.rotate(
+                angle: -mapRotation * 3.14159265 / 180.0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+                  decoration: BoxDecoration(color: stateColor(s), borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6)]),
+                  child: Text(tagText, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+                ),
               ),
             ),
           ),
