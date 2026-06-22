@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/bottom_nav.dart';
 
 class AlertsScreen extends StatefulWidget {
@@ -347,6 +348,8 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
   final _thr = TextEditingController(text: '60');
   final Set<String> _selected = {};
   bool _creating = false;
+  String _soundCategory = 'Default'; // Default | English | Hindi | Telugu | Other Tones
+  String _soundId = 'default';
 
   static const _types = [
     {'t': 'overspeed', 'name': 'Over Speed', 'sub': 'Speed limit', 'icon': Icons.speed, 'color': AppColors.red, 'bg': AppColors.redBg},
@@ -398,6 +401,8 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
     if (!mounted) return;
     setState(() => _creating = false);
     if (ok) {
+      // remember the chosen sound for this alert type so it plays when it fires
+      await NotificationService.setSoundForType(_type, _soundId);
       Navigator.pop(context);
       widget.onCreated();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Alert created and saved to your account')));
@@ -476,6 +481,77 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
                   ]),
                 ),
               ],
+              const SizedBox(height: 16),
+              // ===== ALERT SOUND PICKER (language categories + audios) =====
+              const Text('ALERT SOUND', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink2, letterSpacing: 0.4)),
+              const SizedBox(height: 10),
+              // category tabs: Default / English / Hindi / Telugu / Other Tones
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: kSoundCategories.map((cat) {
+                  final sel = _soundCategory == cat;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () => setState(() {
+                        _soundCategory = cat;
+                        // auto-select first sound in category (or default)
+                        final list = soundsInCategory(cat);
+                        if (list.isNotEmpty) _soundId = list.first.id;
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: sel ? AppColors.teal : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: sel ? AppColors.teal : AppColors.line, width: 1.3),
+                        ),
+                        child: Text(cat, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: sel ? Colors.white : AppColors.ink2)),
+                      ),
+                    ),
+                  );
+                }).toList()),
+              ),
+              const SizedBox(height: 10),
+              // audios within the selected category
+              Container(
+                decoration: BoxDecoration(border: Border.all(color: AppColors.line), borderRadius: BorderRadius.circular(12)),
+                child: Column(children: soundsInCategory(_soundCategory).map((s) {
+                  final sel = _soundId == s.id;
+                  return InkWell(
+                    onTap: () => setState(() => _soundId = s.id),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                      decoration: BoxDecoration(border: s == soundsInCategory(_soundCategory).last ? null : const Border(bottom: BorderSide(color: AppColors.line))),
+                      child: Row(children: [
+                        Icon(sel ? Icons.radio_button_checked : Icons.radio_button_unchecked, size: 19, color: sel ? AppColors.teal : AppColors.muted),
+                        const SizedBox(width: 11),
+                        Expanded(child: Text(s.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+                        if (s.file != 'default')
+                          GestureDetector(
+                            onTap: () async {
+                              await NotificationService.preview(s);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Playing "${s.label}"'), duration: const Duration(seconds: 1)),
+                                );
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                              decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(20)),
+                              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                                Icon(Icons.play_arrow, size: 15, color: AppColors.teal),
+                                SizedBox(width: 3),
+                                Text('Play', style: TextStyle(fontSize: 11, color: AppColors.teal, fontWeight: FontWeight.w700)),
+                              ]),
+                            ),
+                          ),
+                      ]),
+                    ),
+                  );
+                }).toList()),
+              ),
               const SizedBox(height: 16),
               const Text('APPLY TO', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink2, letterSpacing: 0.4)),
               const SizedBox(height: 10),
