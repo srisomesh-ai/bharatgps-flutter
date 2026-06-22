@@ -235,6 +235,7 @@ class ApiService {
           'lat': double.tryParse(la.toString()) ?? 0,
           'lng': double.tryParse(lo.toString()) ?? 0,
           'spd': (double.tryParse('${r['speed'] ?? 0}') ?? 0).round(),
+          'course': double.tryParse('${r['course'] ?? 0}') ?? 0,
           't': r['time'] ?? r['server_time'] ?? '',
         });
       }
@@ -258,7 +259,7 @@ class ApiService {
         final t1 = DateTime.tryParse(points[j - 1]['t'].toString().replaceFirst(' ', 'T'));
         if (t0 != null && t1 != null) {
           final secs = t1.difference(t0).inSeconds;
-          if (secs >= 300) {
+          if (secs >= 180) {
             stops.add({'lat': points[i]['lat'], 'lng': points[i]['lng'], 'mins': (secs / 60).round()});
           }
         }
