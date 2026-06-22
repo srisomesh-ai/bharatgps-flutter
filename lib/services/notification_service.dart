@@ -15,22 +15,53 @@ class AlertSound {
   final String id;
   final String label;
   final String file; // raw resource name, or 'default'
-  const AlertSound(this.id, this.label, this.file);
+  final String category; // 'Default' | 'English' | 'Hindi' | 'Telugu' | 'Other Tones'
+  const AlertSound(this.id, this.label, this.file, [this.category = 'Other Tones']);
 }
 
+// Sound categories shown when creating an alert.
+const kSoundCategories = <String>['Default', 'English', 'Hindi', 'Telugu', 'Other Tones'];
+
 const kAlertSounds = <AlertSound>[
-  AlertSound('default', 'Default', 'default'),
-  AlertSound('eng_on', 'Engine On', 'eng_on'),
-  AlertSound('eng_off', 'Engine Off', 'eng_off'),
-  AlertSound('speed', 'Speed', 'speed'),
-  AlertSound('offline', 'Offline', 'offline'),
-  AlertSound('power', 'Power', 'power'),
-  AlertSound('move', 'Move', 'move'),
-  AlertSound('alert', 'Alert', 'alert'),
-  AlertSound('siren', 'Siren', 'siren'),
-  AlertSound('buzzer', 'Buzzer', 'buzzer'),
-  AlertSound('bell', 'Bell', 'bell'),
+  // Default = phone's default notification sound (no file needed)
+  AlertSound('default', 'Default Notification', 'default', 'Default'),
+
+  // English voice audios
+  AlertSound('en_audio1', 'Audio 1', 'en_audio1', 'English'),
+  AlertSound('en_audio2', 'Audio 2', 'en_audio2', 'English'),
+  AlertSound('en_audio3', 'Audio 3', 'en_audio3', 'English'),
+  AlertSound('en_audio4', 'Audio 4', 'en_audio4', 'English'),
+  AlertSound('en_audio5', 'Audio 5', 'en_audio5', 'English'),
+  AlertSound('en_audio6', 'Audio 6', 'en_audio6', 'English'),
+
+  // Hindi voice audios
+  AlertSound('hi_audio1', 'Audio 1', 'hi_audio1', 'Hindi'),
+  AlertSound('hi_audio2', 'Audio 2', 'hi_audio2', 'Hindi'),
+  AlertSound('hi_audio3', 'Audio 3', 'hi_audio3', 'Hindi'),
+  AlertSound('hi_audio4', 'Audio 4', 'hi_audio4', 'Hindi'),
+  AlertSound('hi_audio5', 'Audio 5', 'hi_audio5', 'Hindi'),
+  AlertSound('hi_audio6', 'Audio 6', 'hi_audio6', 'Hindi'),
+
+  // Telugu voice audios
+  AlertSound('te_audio1', 'Audio 1', 'te_audio1', 'Telugu'),
+  AlertSound('te_audio2', 'Audio 2', 'te_audio2', 'Telugu'),
+  AlertSound('te_audio3', 'Audio 3', 'te_audio3', 'Telugu'),
+  AlertSound('te_audio4', 'Audio 4', 'te_audio4', 'Telugu'),
+  AlertSound('te_audio5', 'Audio 5', 'te_audio5', 'Telugu'),
+  AlertSound('te_audio6', 'Audio 6', 'te_audio6', 'Telugu'),
+
+  // Other tones
+  AlertSound('siren', 'Siren', 'siren', 'Other Tones'),
+  AlertSound('buzzer', 'Buzzer', 'buzzer', 'Other Tones'),
+  AlertSound('bell', 'Bell', 'bell', 'Other Tones'),
+  AlertSound('alert', 'Alert', 'alert', 'Other Tones'),
+  AlertSound('beep', 'Beep', 'beep', 'Other Tones'),
+  AlertSound('horn', 'Horn', 'horn', 'Other Tones'),
 ];
+
+// helper: sounds in a given category
+List<AlertSound> soundsInCategory(String category) =>
+    kAlertSounds.where((s) => s.category == category).toList();
 
 class NotificationService {
   static final _fln = FlutterLocalNotificationsPlugin();
