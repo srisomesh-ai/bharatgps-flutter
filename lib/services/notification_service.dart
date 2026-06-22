@@ -20,11 +20,16 @@ class AlertSound {
 
 const kAlertSounds = <AlertSound>[
   AlertSound('default', 'Default', 'default'),
+  AlertSound('eng_on', 'Engine On', 'eng_on'),
+  AlertSound('eng_off', 'Engine Off', 'eng_off'),
+  AlertSound('speed', 'Speed', 'speed'),
+  AlertSound('offline', 'Offline', 'offline'),
+  AlertSound('power', 'Power', 'power'),
+  AlertSound('move', 'Move', 'move'),
+  AlertSound('alert', 'Alert', 'alert'),
   AlertSound('siren', 'Siren', 'siren'),
-  AlertSound('horn', 'Truck Horn', 'horn'),
-  AlertSound('chime', 'Gentle Chime', 'chime'),
-  AlertSound('alarm', 'Alarm Bell', 'alarm'),
-  AlertSound('beep', 'Short Beep', 'beep'),
+  AlertSound('buzzer', 'Buzzer', 'buzzer'),
+  AlertSound('bell', 'Bell', 'bell'),
 ];
 
 class NotificationService {
