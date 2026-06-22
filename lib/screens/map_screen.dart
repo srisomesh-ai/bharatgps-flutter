@@ -23,7 +23,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   List<String> _gprsDevices = [];
   dynamic _focusId;
   String _search = '';
-  bool _satellite = false;
+  String _mapType = 'normal'; // normal | satellite | hybrid
   bool _showNames = true;
   Map<String, dynamic>? _selected; // for the mini-card
   Timer? _refresh;
@@ -172,6 +172,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   double _toD(dynamic v) => double.tryParse('$v') ?? 0;
 
+  // Google Maps tiles: lyrs=m (normal), s (satellite), y (hybrid)
+  String _googleTileUrl() {
+    final lyrs = _mapType == 'satellite' ? 's' : (_mapType == 'hybrid' ? 'y' : 'm');
+    return 'https://mt{s}.google.com/vt/lyrs=$lyrs&x={x}&y={y}&z={z}&hl=en';
+  }
+
   // tail trail = breadcrumbs dropped as the vehicle glides (the path already
   // travelled). Only shows BEHIND the vehicle, never a line to the next point.
   List<Polyline> _tailPolylines() {
@@ -311,8 +317,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 6)]),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  _segBtn('Map', !_satellite, () => setState(() => _satellite = false)),
-                  _segBtn('Satellite', _satellite, () => setState(() => _satellite = true)),
+                  _segBtn('Map', _mapType == 'normal', () => setState(() => _mapType = 'normal')),
+                  _segBtn('Satellite', _mapType == 'satellite', () => setState(() => _mapType = 'satellite')),
+                  _segBtn('Hybrid', _mapType == 'hybrid', () => setState(() => _mapType = 'hybrid')),
                 ]),
               ),
             ]),
@@ -329,11 +336,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 ),
                 children: [
                   TileLayer(
-                    urlTemplate: _satellite
-                        ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-                        : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                    subdomains: const ['a', 'b', 'c', 'd'],
+                    urlTemplate: _googleTileUrl(),
+                    subdomains: const ['0', '1', '2', '3'],
                     userAgentPackageName: 'com.bharatgps.app',
+                    maxZoom: 20,
                   ),
                   PolylineLayer(polylines: _tailPolylines()),
                   MarkerLayer(markers: _markers()),
@@ -354,7 +360,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     }
                   }),
                   const SizedBox(height: 12),
-                  _mapCtrl(Icons.layers_outlined, () => setState(() => _satellite = !_satellite)),
+                  _mapCtrl(Icons.layers_outlined, () => setState(() {
+                        _mapType = _mapType == 'normal' ? 'satellite' : (_mapType == 'satellite' ? 'hybrid' : 'normal');
+                      })),
                   const SizedBox(height: 12),
                   // show/hide vehicle names
                   _mapCtrl(_showNames ? Icons.label : Icons.label_off, () => setState(() => _showNames = !_showNames)),
@@ -466,9 +474,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(color: active ? AppColors.teal : Colors.transparent, borderRadius: BorderRadius.circular(16)),
-        child: Text(label, style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w700, fontSize: 13)),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        decoration: BoxDecoration(color: active ? AppColors.teal : Colors.transparent, borderRadius: BorderRadius.circular(14)),
+        child: Text(label, style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w700, fontSize: 11.5)),
       ),
     );
   }
