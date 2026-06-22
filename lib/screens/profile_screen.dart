@@ -14,6 +14,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int total = 0, run = 0, idle = 0, off = 0;
   String _plan = 'Active Plan';
   String _valid = 'Tap to view details';
+  Map<String, dynamic>? _userData; // full account data from server
 
   @override
   void initState() {
@@ -44,8 +45,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final u = await ApiService.getUserData();
     if (!mounted || u == null) return;
     setState(() {
+      _userData = u;
       if (u['plan'] != null) _plan = u['plan'].toString();
-      if (u['expiration_date'] != null) _valid = 'Valid till ${u['expiration_date']}';
+      final days = u['days_left'];
+      if (u['expiration_date'] != null) {
+        final exp = u['expiration_date'].toString();
+        _valid = days != null ? 'Valid till $exp · $days days left' : 'Valid till $exp';
+      }
     });
   }
 
@@ -69,6 +75,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _soon(String label) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label — coming soon'), duration: const Duration(seconds: 2)));
+  }
+
+  // Shows the real account information pulled from the server.
+  void _showAccountInfo() {
+    Haptics.light();
+    final u = _userData ?? {};
+    final rows = <List<String>>[
+      ['Name', ApiService.userName ?? '—'],
+      ['Email', (u['email'] ?? ApiService.userEmail ?? '—').toString()],
+      ['Plan', (u['plan'] ?? _plan).toString()],
+      ['Expiry Date', (u['expiration_date'] ?? '—').toString()],
+      ['Days Left', u['days_left'] != null ? '${u['days_left']} days' : '—'],
+      ['Device Limit', u['devices_limit'] != null ? '${u['devices_limit']}' : '—'],
+      ['Total Vehicles', '$total'],
+      ['Server', ApiService.host ?? '—'],
+    ];
+    _showSheet('Account Information', Icons.person_outline, rows);
+  }
+
+  void _showAbout() {
+    Haptics.light();
+    final rows = <List<String>>[
+      ['App', 'Bharat GPS Tracker'],
+      ['Version', '1.0.0'],
+      ['Server', ApiService.host ?? '—'],
+      ['Account', ApiService.userEmail ?? ApiService.userName ?? '—'],
+      ['Powered by', 'BharatGPS'],
+    ];
+    _showSheet('About Bharat GPS Tracker', Icons.info_outline, rows);
+  }
+
+  void _showSheet(String title, IconData icon, List<List<String>> rows) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+        padding: EdgeInsets.fromLTRB(20, 14, 20, 20 + MediaQuery.of(context).padding.bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Center(child: Container(width: 38, height: 5, margin: const EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: const Color(0xFFE2E9E8), borderRadius: BorderRadius.circular(3)))),
+          Row(children: [
+            Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(11)), child: Icon(icon, color: AppColors.teal, size: 21)),
+            const SizedBox(width: 12),
+            Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+          ]),
+          const SizedBox(height: 16),
+          ...rows.map((r) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  SizedBox(width: 120, child: Text(r[0], style: const TextStyle(fontSize: 13, color: AppColors.ink2, fontWeight: FontWeight.w600))),
+                  Expanded(child: Text(r[1], style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700))),
+                ]),
+              )),
+        ]),
+      ),
+    );
   }
 
   @override
@@ -122,39 +184,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ]),
                     ),
                     const SizedBox(height: 14),
-                    // plan banner
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(gradient: const LinearGradient(colors: [AppColors.teal, AppColors.teal2]), borderRadius: BorderRadius.circular(18)),
-                      child: Row(children: [
-                        Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.amber.withOpacity(0.9), shape: BoxShape.circle), child: const Icon(Icons.workspace_premium, color: Colors.white)),
-                        const SizedBox(width: 13),
-                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text('Current Plan', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
-                          Text(_plan, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
-                          Text(_valid, style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
-                        ])),
-                      ]),
+                    // plan banner (tap to view account details)
+                    GestureDetector(
+                      onTap: _showAccountInfo,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(gradient: const LinearGradient(colors: [AppColors.teal, AppColors.teal2]), borderRadius: BorderRadius.circular(18)),
+                        child: Row(children: [
+                          Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.amber.withOpacity(0.9), shape: BoxShape.circle), child: const Icon(Icons.workspace_premium, color: Colors.white)),
+                          const SizedBox(width: 13),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const Text('Current Plan', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
+                            Text(_plan, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
+                            Text(_valid, style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
+                          ])),
+                          const Icon(Icons.chevron_right, color: Colors.white70),
+                        ]),
+                      ),
                     ),
                     const SizedBox(height: 14),
                     // menu
                     Container(
                       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: const [BoxShadow(color: Color(0x140E5C5C), blurRadius: 16)]),
                       child: Column(children: [
-                        _menu(Icons.person_outline, 'Account Information', 'Edit your personal information'),
+                        _menu(Icons.person_outline, 'Account Information', 'View your account details', onTap: _showAccountInfo),
                         _menu(Icons.business_outlined, 'Company Information', 'Manage company details'),
                         _menu(Icons.group_outlined, 'User Management', 'Manage users and permissions'),
                         _menu(Icons.credit_card, 'Subscription & Billing', 'View invoices and payment history'),
-                        _menu(Icons.notifications_none, 'Notification Settings', 'Manage alert preferences', onTap: () => Navigator.pushNamed(context, '/notification-settings')),
+                        _menu(Icons.notifications_none, 'Notification Settings', 'Manage alert preferences', onTap: () { Haptics.light(); Navigator.pushNamed(context, '/notification-settings'); }),
                         _menu(Icons.shield_outlined, 'Security', 'Change password and security'),
                         _menu(Icons.help_outline, 'Help & Support', 'FAQs, guides and contact support'),
-                        _menu(Icons.info_outline, 'About Bharat GPS Tracker', 'App version and information', last: true),
+                        _menu(Icons.info_outline, 'About Bharat GPS Tracker', 'App version and information', last: true, onTap: _showAbout),
                       ]),
                     ),
                     const SizedBox(height: 14),
                     // logout
                     GestureDetector(
-                      onTap: _logout,
+                      onTap: () { Haptics.medium(); _logout(); },
                       child: Container(
                         padding: const EdgeInsets.all(17),
                         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: const [BoxShadow(color: Color(0x140E5C5C), blurRadius: 16)]),
@@ -185,7 +251,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
   Widget _menu(IconData ic, String title, String sub, {bool last = false, VoidCallback? onTap}) => InkWell(
-        onTap: onTap ?? () => _soon(title),
+        onTap: onTap ?? () { Haptics.light(); _soon(title); },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           decoration: BoxDecoration(border: last ? null : const Border(bottom: BorderSide(color: AppColors.line))),
