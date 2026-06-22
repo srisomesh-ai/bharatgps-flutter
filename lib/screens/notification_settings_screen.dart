@@ -11,6 +11,7 @@ class NotificationSettingsScreen extends StatefulWidget {
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
   String _selected = 'default';
   bool _enabled = true;
+  final Map<String, String> _typeSounds = {};
 
   @override
   void initState() {
@@ -20,6 +21,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
 
   Future<void> _load() async {
     final s = await NotificationService.currentSound();
+    // load each type's chosen sound
+    for (final type in NotificationService.alertTypes.keys) {
+      final ts = await NotificationService.soundForType(type);
+      _typeSounds[type] = ts.id;
+    }
     if (mounted) setState(() => _selected = s.id);
   }
 
@@ -129,13 +135,98 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: const [
                   Icon(Icons.info_outline, size: 17, color: AppColors.teal),
                   SizedBox(width: 9),
-                  Expanded(child: Text('Tap “Play” to preview a sound. Your selected tone plays for all vehicle alerts. On Android, the sound applies to new notifications.', style: TextStyle(fontSize: 12, color: AppColors.ink2, height: 1.4))),
+                  Expanded(child: Text('The sound above is the default for all alerts. Below, you can set a different sound for each alert type.', style: TextStyle(fontSize: 12, color: AppColors.ink2, height: 1.4))),
                 ]),
+              ),
+              const SizedBox(height: 20),
+              const Padding(
+                padding: EdgeInsets.only(left: 4, bottom: 10),
+                child: Text('SOUND PER ALERT TYPE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink2, letterSpacing: 0.5)),
+              ),
+              Container(
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 10)]),
+                child: Column(
+                  children: List.generate(NotificationService.alertTypes.length, (i) {
+                    final entry = NotificationService.alertTypes.entries.elementAt(i);
+                    final type = entry.key;
+                    final label = entry.value;
+                    final soundId = _typeSounds[type] ?? _selected;
+                    final soundLabel = kAlertSounds.firstWhere((s) => s.id == soundId, orElse: () => kAlertSounds.first).label;
+                    return InkWell(
+                      onTap: () => _pickTypeSound(type, label),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(border: i == NotificationService.alertTypes.length - 1 ? null : const Border(bottom: BorderSide(color: AppColors.line))),
+                        child: Row(children: [
+                          Container(
+                            width: 38, height: 38,
+                            decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(11)),
+                            child: Icon(_typeIcon(type), size: 19, color: AppColors.teal),
+                          ),
+                          const SizedBox(width: 13),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(label, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
+                            Text(soundLabel, style: const TextStyle(fontSize: 11.5, color: AppColors.muted)),
+                          ])),
+                          const Icon(Icons.chevron_right, color: AppColors.muted),
+                        ]),
+                      ),
+                    );
+                  }),
+                ),
               ),
             ],
           ),
         ),
       ]),
+    );
+  }
+
+  IconData _typeIcon(String type) {
+    switch (type) {
+      case 'overspeed': return Icons.speed;
+      case 'move_duration': return Icons.trending_flat;
+      case 'ignition_duration': return Icons.power_settings_new;
+      case 'powercut': return Icons.flash_on;
+      case 'lowbattery': return Icons.battery_alert;
+      default: return Icons.notifications;
+    }
+  }
+
+  Future<void> _pickTypeSound(String type, String label) async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.of(context).padding.bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Center(child: Container(width: 38, height: 5, margin: const EdgeInsets.only(bottom: 14), decoration: BoxDecoration(color: const Color(0xFFE2E9E8), borderRadius: BorderRadius.circular(3)))),
+          Text('Sound for $label', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          ...kAlertSounds.map((s) {
+            final sel = (_typeSounds[type] ?? _selected) == s.id;
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(width: 36, height: 36, decoration: BoxDecoration(color: sel ? AppColors.teal : AppColors.bg, borderRadius: BorderRadius.circular(10)), child: Icon(Icons.music_note, size: 18, color: sel ? Colors.white : AppColors.ink2)),
+              title: Text(s.label, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
+              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                GestureDetector(
+                  onTap: () => NotificationService.preview(s),
+                  child: Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6), decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(20)), child: const Icon(Icons.play_arrow, size: 16, color: AppColors.teal)),
+                ),
+                const SizedBox(width: 10),
+                if (sel) const Icon(Icons.check_circle, color: AppColors.teal),
+              ]),
+              onTap: () async {
+                await NotificationService.setSoundForType(type, s.id);
+                if (mounted) setState(() => _typeSounds[type] = s.id);
+                if (context.mounted) Navigator.pop(context);
+              },
+            );
+          }),
+        ]),
+      ),
     );
   }
 }
