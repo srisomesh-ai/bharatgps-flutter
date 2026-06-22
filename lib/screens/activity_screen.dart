@@ -54,10 +54,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    int moving = 0, active = 0;
+    int moving = 0, active = 0, idle = 0, offline = 0;
     for (final u in _devices) {
       final s = stateOf(u['online'], u['speed']);
       if (s == 'rn') moving++;
+      if (s == 'id') idle++;
+      if (s == 'of') offline++;
       if (s != 'of') active++;
     }
     return Scaffold(
@@ -85,16 +87,41 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                     children: [
+                      // Fleet status breakdown (running / idle / offline at a glance)
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 10)]),
+                        child: Column(children: [
+                          Row(children: [
+                            const Text('Fleet Status', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                            const Spacer(),
+                            Text('${_devices.length} vehicles', style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+                          ]),
+                          const SizedBox(height: 12),
+                          // status bar (proportional)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Row(children: [
+                              if (moving > 0) Expanded(flex: moving, child: Container(height: 10, color: AppColors.green)),
+                              if (idle > 0) Expanded(flex: idle, child: Container(height: 10, color: AppColors.orange)),
+                              if (offline > 0) Expanded(flex: offline, child: Container(height: 10, color: AppColors.red)),
+                              if (_devices.isEmpty) Expanded(child: Container(height: 10, color: AppColors.line)),
+                            ]),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+                            _legend(AppColors.green, 'Running', moving),
+                            _legend(AppColors.orange, 'Idle', idle),
+                            _legend(AppColors.red, 'Offline', offline),
+                          ]),
+                        ]),
+                      ),
+                      const SizedBox(height: 12),
+                      // insights row: fleet distance today + needs attention
                       Row(children: [
-                        _fleet('${_fleetKm.round()}', 'km', 'Total Distance', AppColors.blue, AppColors.blueBg, Icons.show_chart),
+                        _fleet('${_fleetKm.round()}', 'km', 'Fleet Distance Today', AppColors.blue, AppColors.blueBg, Icons.show_chart),
                         const SizedBox(width: 10),
-                        _fleet('$moving', '', 'Moving Now', AppColors.green, AppColors.greenBg, Icons.play_arrow),
-                      ]),
-                      const SizedBox(height: 10),
-                      Row(children: [
-                        _fleet('$active/${_devices.length}', '', 'Active Vehicles', AppColors.violet, AppColors.violetBg, Icons.bolt),
-                        const SizedBox(width: 10),
-                        _fleet('${_devices.length}', '', 'Total Vehicles', AppColors.orange, AppColors.orangeBg, Icons.local_shipping),
+                        _fleet('$offline', '', offline == 0 ? 'All Online' : 'Need Attention', offline == 0 ? AppColors.green : AppColors.red, offline == 0 ? AppColors.greenBg : AppColors.redBg, offline == 0 ? Icons.check_circle : Icons.warning_amber),
                       ]),
                       const SizedBox(height: 18),
                       const Text('VEHICLE REPORTS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink2, letterSpacing: 0.5)),
@@ -107,6 +134,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
       bottomNavigationBar: const BottomNav(current: 1),
     );
   }
+
+  Widget _legend(Color c, String label, int count) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 9, height: 9, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+        const SizedBox(width: 5),
+        Text('$count', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+        const SizedBox(width: 3),
+        Text(label, style: const TextStyle(fontSize: 11, color: AppColors.muted)),
+      ]);
 
   Widget _fleet(String v, String unit, String label, Color color, Color bg, IconData ic) => Expanded(
         child: Container(
