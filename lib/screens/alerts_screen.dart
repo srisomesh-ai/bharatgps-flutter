@@ -199,7 +199,13 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
     );
     if (ok != true) return;
     final done = await ApiService.deleteAlert(a['id']);
-    if (done && mounted) setState(() => _alerts.remove(a));
+    if (!mounted) return;
+    if (done) {
+      setState(() => _alerts.remove(a));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Alert deleted from server')));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not delete alert on server')));
+    }
   }
 
   Widget _historyTab() {
@@ -228,25 +234,54 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
       final t = _guessType((e['message'] ?? '').toString());
       final m = _meta(t);
       final vname = _names['${e['device_id']}'] ?? 'Device ${e['device_id']}';
+      final color = m['color'] as Color;
+      final bg = m['bg'] as Color;
+      final addr = (e['address'] ?? '').toString();
+      final spd = e['speed'] != null ? ' · ${(e['speed'] as num).round()} km/h' : '';
       items.add(Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13), boxShadow: const [BoxShadow(color: Color(0x0D0E5C5C), blurRadius: 10)]),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(width: 38, height: 38, decoration: BoxDecoration(color: m['bg'] as Color, borderRadius: BorderRadius.circular(10)), child: Icon(m['icon'] as IconData, color: m['color'] as Color, size: 19)),
-          const SizedBox(width: 11),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(e['message'] ?? m['name'], style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
-            Text('$vname${e['speed'] != null ? ' · ${(e['speed'] as num).round()} km/h' : ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.ink2)),
-            const SizedBox(height: 3),
-            Row(children: [
-              const Icon(Icons.schedule, size: 11, color: AppColors.muted),
-              const SizedBox(width: 4),
-              Text(_fullStamp(e['time']), style: const TextStyle(fontSize: 11, color: AppColors.muted)),
-            ]),
-          ])),
-          Text(_timeLabel(e['time']), style: const TextStyle(fontSize: 10.5, color: AppColors.muted, fontWeight: FontWeight.w600)),
-        ]),
+        margin: const EdgeInsets.only(bottom: 11),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: const [BoxShadow(color: Color(0x120E5C5C), blurRadius: 10)]),
+        clipBehavior: Clip.antiAlias,
+        child: IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            // colored left accent strip
+            Container(width: 5, color: color),
+            Expanded(child: Padding(
+              padding: const EdgeInsets.fromLTRB(13, 12, 13, 12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                // top: icon + vehicle name (prominent) + time
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(width: 40, height: 40, decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(11)), child: Icon(m['icon'] as IconData, color: color, size: 20)),
+                  const SizedBox(width: 11),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(vname, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, height: 1.1)),
+                    if (addr.isNotEmpty)
+                      Padding(padding: const EdgeInsets.only(top: 2), child: Row(children: [
+                        const Icon(Icons.place, size: 11, color: AppColors.muted),
+                        const SizedBox(width: 3),
+                        Expanded(child: Text(addr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AppColors.muted))),
+                      ])),
+                  ])),
+                  const SizedBox(width: 6),
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text(_timeLabel(e['time']), style: const TextStyle(fontSize: 11, color: AppColors.ink2, fontWeight: FontWeight.w700)),
+                  ]),
+                ]),
+                const SizedBox(height: 10),
+                // colored alert-type tag below
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                  decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(9)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(m['icon'] as IconData, size: 13, color: color),
+                    const SizedBox(width: 6),
+                    Text('${m['name']}$spd', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: color)),
+                  ]),
+                ),
+              ]),
+            )),
+          ]),
+        ),
       ));
     }
     return ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 16), children: items);
@@ -357,7 +392,7 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
     if (ok) {
       Navigator.pop(context);
       widget.onCreated();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Alert created')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Alert created and saved to your account')));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text((_type == 'powercut' || _type == 'lowbattery')
