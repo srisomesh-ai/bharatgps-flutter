@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import 'tour_keys.dart';
 import '../services/api_service.dart';
 import 'geofence_screen.dart';
 import '../services/notification_service.dart';
@@ -127,6 +128,7 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   FloatingActionButton.extended(
+                    key: TourKeys.alertsGeofence,
                     heroTag: 'geofenceFab',
                     backgroundColor: Colors.white,
                     foregroundColor: AppColors.teal,
@@ -140,6 +142,7 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
                   ),
                   const SizedBox(height: 12),
                   FloatingActionButton.extended(
+                    key: TourKeys.alertsCreate,
                     heroTag: 'createFab',
                     backgroundColor: AppColors.teal,
                     foregroundColor: Colors.white,
