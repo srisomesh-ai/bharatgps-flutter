@@ -1275,11 +1275,8 @@ class _ShareSheetState extends State<_ShareSheet> {
     bool opened = false;
     for (final t in targets) {
       try {
-        final uri = Uri.parse(t);
-        if (await canLaunchUrl(uri)) {
-          opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-          if (opened) break;
-        }
+        opened = await launchUrl(Uri.parse(t), mode: LaunchMode.externalApplication);
+        if (opened) break;
       } catch (_) {}
     }
     if (!opened) {
