@@ -628,6 +628,36 @@ class ApiService {
 
   /// Fetch the alert types the server actually supports (definitive source).
   /// Returns a list of {type, title, options...}.
+  /// Debug: raw get_alerts_attributes (to find the exact geofence alert type).
+  static Future<String> getAlertAttributesRaw() async {
+    try {
+      final res = await http.get(_u(host!, 'get_alerts_attributes', {'lang': 'en', 'user_api_hash': hash!}))
+          .timeout(const Duration(seconds: 20));
+      // extract just the geofence-related types to keep it short
+      String summary = '';
+      try {
+        final j = jsonDecode(res.body);
+        final types = (j is Map && j['types'] is List) ? j['types'] as List : [];
+        for (final t in types) {
+          if (t is Map) {
+            final ty = '${t['type'] ?? ''}${t['name'] ?? ''}'.toLowerCase();
+            if (ty.contains('geo') || ty.contains('zone')) {
+              summary += 'type="${t['type']}" name="${t['name']}" title="${t['title']}"\n';
+              if (t['options'] is List) {
+                for (final o in t['options']) {
+                  summary += '   option id="${o['id']}" title="${o['title']}"\n';
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+      return 'HTTP ${res.statusCode}\n\nGEOFENCE TYPES FOUND:\n${summary.isEmpty ? "(none matched geo/zone)" : summary}\n\nFULL (first 1500):\n${res.body.length > 1500 ? res.body.substring(0, 1500) : res.body}';
+    } catch (e) {
+      return 'ERROR: $e';
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> getAlertAttributes() async {
     try {
       final res = await http.get(_u(host!, 'get_alerts_attributes', {
@@ -729,6 +759,7 @@ class ApiService {
     int? moveDuration,
     int? ignitionDuration,
     int? geofenceId,
+    String? geofenceDirection, // 'in' | 'out' | 'in_out'
   }) async {
     // map our friendly types to the GPSWOX server type + extra params
     String serverType = type;
@@ -753,7 +784,9 @@ class ApiService {
         serverType = 'low_battery';
         break;
       case 'geofence':
-        serverType = 'geofence_in_out'; // enter/exit a geofence
+        // GPSWOX geofence alert types: geofence_in / geofence_out / geofence_in_out
+        final dir = geofenceDirection ?? 'in_out';
+        serverType = dir == 'in' ? 'geofence_in' : (dir == 'out' ? 'geofence_out' : 'geofence_in_out');
         if (geofenceId != null) extra['geofences'] = [geofenceId];
         break;
     }
