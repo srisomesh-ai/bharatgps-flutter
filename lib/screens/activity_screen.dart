@@ -56,7 +56,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
   Widget build(BuildContext context) {
     int moving = 0, active = 0, idle = 0, offline = 0;
     for (final u in _devices) {
-      final s = stateOf(u['online'], u['speed']);
+      final s = stableStateFor('${u['id']}', u['online'], u['speed']);
       if (s == 'rn') moving++;
       if (s == 'id') idle++;
       if (s == 'of') offline++;
@@ -161,7 +161,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
   Widget _reportCard(Map<String, dynamic> u) {
     final id = '${u['id']}';
-    final s = stateOf(u['online'], u['speed']);
+    final s = stableStateFor('${u['id']}', u['online'], u['speed']);
     final st = _stats[id];
     final loadingThis = _loadingStats.contains(id);
     return Container(
