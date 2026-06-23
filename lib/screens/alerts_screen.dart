@@ -142,9 +142,10 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
                   FloatingActionButton.extended(
                     heroTag: 'createFab',
                     backgroundColor: AppColors.teal,
+                    foregroundColor: Colors.white,
                     onPressed: _openCreate,
                     icon: const Icon(Icons.add),
-                    label: const Text('Create'),
+                    label: const Text('Create', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ],
               )
@@ -388,6 +389,7 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
   List<Map<String, dynamic>> _geofences = [];
   int? _selectedGeofenceId;
   bool _loadingGeofences = false;
+  String _geoDirection = 'in_out'; // 'in' | 'out' | 'in_out'
 
   Future<void> _loadGeofencesForAlert() async {
     setState(() => _loadingGeofences = true);
@@ -421,6 +423,25 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
   // engine on/off and power cut are event-based — no threshold needed
   bool get _hasThreshold => _type != 'powercut' && _type != 'engine_on' && _type != 'engine_off' && _type != 'geofence';
 
+  Widget _dirChip(String label, String val) {
+    final sel = _geoDirection == val;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () { Haptics.select(); setState(() => _geoDirection = val); },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: sel ? AppColors.teal : Colors.white,
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: sel ? AppColors.teal : AppColors.line, width: 1.4),
+          ),
+          child: Text(label, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: sel ? Colors.white : AppColors.ink2)),
+        ),
+      ),
+    );
+  }
+
   Future<void> _create() async {
     if (_selected.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select at least one vehicle')));
@@ -441,6 +462,7 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
       moveDuration: _type == 'move_duration' ? thr : (_type == 'offline' ? thr : null),
       ignitionDuration: _type == 'ignition_duration' ? thr : null,
       geofenceId: _type == 'geofence' ? _selectedGeofenceId : null,
+      geofenceDirection: _type == 'geofence' ? _geoDirection : null,
     );
     if (!mounted) return;
     setState(() => _creating = false);
@@ -451,6 +473,20 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
       widget.onCreated();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Alert created and saved to your account')));
     } else {
+      if (_type == 'geofence') {
+        // show what geofence alert types the server actually supports
+        final raw = await ApiService.getAlertAttributesRaw();
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Geofence alert — server types'),
+            content: SingleChildScrollView(child: Text(raw, style: const TextStyle(fontSize: 10))),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+          ),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text((_type == 'powercut' || _type == 'lowbattery')
             ? 'This alert may not be supported by your device/server'
@@ -570,6 +606,18 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
                       ),
                     ),
                   ),
+                if (_geofences.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  const Text('TRIGGER ON', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink2, letterSpacing: 0.4)),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    _dirChip('Enter', 'in'),
+                    const SizedBox(width: 8),
+                    _dirChip('Exit', 'out'),
+                    const SizedBox(width: 8),
+                    _dirChip('Both', 'in_out'),
+                  ]),
+                ],
               ],
               const SizedBox(height: 16),
               const Text('ALERT SOUND', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink2, letterSpacing: 0.4)),
