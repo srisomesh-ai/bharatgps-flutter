@@ -1037,8 +1037,10 @@ class ApiService {
         final j = jsonDecode(res.body);
         if (j is Map) {
           final m = Map<String, dynamic>.from(j);
-          // some servers wrap it under 'item'
-          final item = (m['item'] is Map) ? Map<String, dynamic>.from(m['item']) : m;
+          // the share record can be at top level, under 'item', or under 'data'
+          Map<String, dynamic> item = m;
+          if (m['data'] is Map) item = Map<String, dynamic>.from(m['data']);
+          else if (m['item'] is Map) item = Map<String, dynamic>.from(m['item']);
           final hashVal = item['hash'] ?? m['hash'];
           if (hashVal != null) {
             return {
