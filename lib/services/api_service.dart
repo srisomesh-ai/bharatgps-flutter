@@ -463,7 +463,16 @@ class ApiService {
       }
     }
     closeTrip();
-    trips.sort((a, b) => '${b['start']}'.compareTo('${a['start']}'));
+    // sort by the REAL start time (newest first). Sorting the raw string fails
+    // because the format is DD-MM-YYYY hh:mm AM/PM, not chronological as text.
+    trips.sort((a, b) {
+      final ta = parseTs(a['start']);
+      final tb = parseTs(b['start']);
+      if (ta == null && tb == null) return 0;
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      return tb.compareTo(ta); // newest first
+    });
     return trips;
   }
 
