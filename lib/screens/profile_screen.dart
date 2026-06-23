@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import 'main_shell.dart';
 import '../services/api_service.dart';
 import 'store_screen.dart';
+import 'onboarding.dart';
 import '../widgets/bottom_nav.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -212,6 +213,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _menu(Icons.business_outlined, 'Company Information', 'Manage company details'),
                         _menu(Icons.group_outlined, 'User Management', 'Manage users and permissions'),
                         _menu(Icons.storefront, 'Store & Services', 'Buy GPS, renew plans, request services', onTap: () { Haptics.light(); Navigator.push(context, MaterialPageRoute(builder: (_) => const StoreScreen())); }),
+                        _menu(Icons.help_center_outlined, 'How to Use', 'Replay the app feature tour', onTap: () async {
+                          Haptics.light();
+                          await FeatureTour.replay();
+                          if (context.mounted) {
+                            Navigator.pushNamedAndRemoveUntil(context, '/home', (r) => false);
+                          }
+                        }),
                         _menu(Icons.notifications_none, 'Notification Settings', 'Manage alert preferences', onTap: () { Haptics.light(); Navigator.pushNamed(context, '/notification-settings'); }),
                         _menu(Icons.shield_outlined, 'Security', 'Change password and security'),
                         _menu(Icons.help_outline, 'Help & Support', 'FAQs, guides and contact support'),
