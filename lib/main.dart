@@ -6,6 +6,7 @@ import 'theme/app_theme.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'screens/login_screen.dart';
+import 'screens/onboarding.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/activity_screen.dart';
@@ -50,7 +51,7 @@ class BharatGpsApp extends StatelessWidget {
       theme: buildTheme(),
       initialRoute: ApiService.isLoggedIn ? '/home' : '/login',
       routes: {
-        '/login': (_) => const LoginScreen(),
+        '/login': (_) => const _LoginGate(),
         // All 5 tabs live in one shell (instant switching, fixed header + nav).
         '/home': (_) => const MainShell(),
         '/dashboard': (_) => const MainShell(initialIndex: 0),
@@ -61,5 +62,38 @@ class BharatGpsApp extends StatelessWidget {
         '/notification-settings': (_) => const NotificationSettingsScreen(),
       },
     );
+  }
+}
+
+/// Shows the Welcome Carousel once (first app open after install), then login.
+class _LoginGate extends StatefulWidget {
+  const _LoginGate();
+  @override
+  State<_LoginGate> createState() => _LoginGateState();
+}
+
+class _LoginGateState extends State<_LoginGate> {
+  bool? _showCarousel;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    final seen = await WelcomeCarousel.alreadySeen();
+    if (mounted) setState(() => _showCarousel = !seen);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showCarousel == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_showCarousel == true) {
+      return WelcomeCarousel(onDone: () => setState(() => _showCarousel = false));
+    }
+    return const LoginScreen();
   }
 }
