@@ -452,19 +452,58 @@ class ApiService {
   /// Debug: raw edit_device_data response (to find where expiry lives).
   static Future<String> fetchDeviceExpiryRaw(String deviceId) async {
     try {
+      // try get_devices_latest (different endpoint — may expose expiry)
+      final latest = await http.get(_u(host!, 'get_devices_latest', {
+        'lang': 'en',
+        'user_api_hash': hash!,
+        'filter[id]': deviceId,
+      })).timeout(const Duration(seconds: 20));
+      // also the normal edit endpoint
       final res = await http.get(_u(host!, 'edit_device_data', {
         'lang': 'en',
         'user_api_hash': hash!,
         'device_id': deviceId,
       })).timeout(const Duration(seconds: 20));
-      // also get user-level expiry
       final ud = await getUserData();
-      return 'HTTP ${res.statusCode}\nhost: $host\n\n'
-          'USER expiry: ${ud?['expiration_date']}\nUSER days_left: ${ud?['days_left']}\n\n'
-          'EDIT_DEVICE_DATA:\n${res.body}';
+
+      // try to extract expiration from get_devices_latest
+      String latestExp = '(not found)';
+      try {
+        final lj = jsonDecode(latest.body);
+        final found = _deepFindAnyKey(lj, 'expiration_date');
+        latestExp = found?.toString() ?? '(none)';
+      } catch (_) {}
+
+      return 'host: $host\n\n'
+          '=== get_devices_latest expiration_date: $latestExp ===\n'
+          'HTTP ${latest.statusCode}\n${latest.body.length > 1200 ? latest.body.substring(0, 1200) : latest.body}\n\n'
+          '=== USER ===\nexpiry: ${ud?['expiration_date']}  days_left: ${ud?['days_left']}\n\n'
+          '=== edit_device_data HTTP ${res.statusCode} ===\n${res.body.length > 600 ? res.body.substring(0, 600) : res.body}';
     } catch (e) {
       return 'ERROR: $e';
     }
+  }
+
+  // find the first value for any key matching `key` anywhere in the structure
+  static dynamic _deepFindAnyKey(dynamic node, String key) {
+    if (node is Map) {
+      for (final e in node.entries) {
+        if (e.key.toString() == key) {
+          final v = e.value?.toString() ?? '';
+          if (v.isNotEmpty && v != 'null' && !v.startsWith('0000')) return e.value;
+        }
+      }
+      for (final v in node.values) {
+        final r = _deepFindAnyKey(v, key);
+        if (r != null) return r;
+      }
+    } else if (node is List) {
+      for (final v in node) {
+        final r = _deepFindAnyKey(v, key);
+        if (r != null) return r;
+      }
+    }
+    return null;
   }
 
   static Future<String?> fetchDeviceExpiry(String deviceId) async {
