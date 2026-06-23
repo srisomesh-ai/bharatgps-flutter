@@ -128,12 +128,14 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
   }
 }
 
-/// Spotlight feature tour — a self-contained overlay shown after first login.
-/// It describes the key features without needing to attach keys to existing
-/// widgets (keeps the working screens untouched). Shows a dimmed card sequence.
+/// Spotlight feature tour shown after first login. It drives the MainShell to
+/// switch tabs as it explains each one, and points a down-arrow at the active
+/// bottom-nav item. Self-contained: the only hook into existing code is the
+/// onGoToTab callback (the shell already had a goTo method).
 class FeatureTour extends StatefulWidget {
   final VoidCallback onDone;
-  const FeatureTour({super.key, required this.onDone});
+  final ValueChanged<int> onGoToTab; // ask the shell to switch tab
+  const FeatureTour({super.key, required this.onDone, required this.onGoToTab});
 
   static const _seenKey = 'seen_tour_v1';
 
@@ -160,16 +162,25 @@ class FeatureTour extends StatefulWidget {
 class _FeatureTourState extends State<FeatureTour> {
   int _i = 0;
 
+  // tab: which bottom-nav index this step relates to (0=Dashboard,1=Activity,
+  // 2=Map,3=Alerts,4=Profile). arrow=true points a down-arrow at that nav item.
   static const _stops = [
-    {'icon': Icons.map, 'title': 'Live Map', 'text': 'All your vehicles appear here in real-time with speed and direction. This is your home screen.', 'pos': 'center'},
-    {'icon': Icons.touch_app, 'title': 'Tap a Vehicle', 'text': 'Tap any vehicle on the map to see its speed, engine status, GPS signal and device expiry.', 'pos': 'center'},
-    {'icon': Icons.share, 'title': 'Share Live Tracking', 'text': 'Use the Share button to send a live tracking link via WhatsApp — no login needed for them, and it expires automatically.', 'pos': 'right'},
-    {'icon': Icons.layers, 'title': 'Geofence Zones', 'text': 'Toggle your geofence zones on the map. Create zones from the Alerts section.', 'pos': 'right'},
-    {'icon': Icons.dashboard, 'title': 'Dashboard', 'text': 'Your whole fleet at a glance — tap the stat cards to filter Running, Idle or Offline vehicles.', 'pos': 'bottom'},
-    {'icon': Icons.notifications, 'title': 'Alerts & Geofence', 'text': 'Create alerts for speed, engine, power cut, and geofence entry/exit. Choose alert sounds too.', 'pos': 'bottom'},
-    {'icon': Icons.person, 'title': 'Profile & Store', 'text': 'Manage your account, buy GPS devices, renew your plan, and replay this tour anytime from "How to Use".', 'pos': 'bottom'},
-    {'icon': Icons.celebration, 'title': 'You\'re all set!', 'text': 'That\'s the tour. You can replay it anytime from Profile → How to Use. Happy tracking! 🛰', 'pos': 'center'},
+    {'icon': Icons.dashboard, 'title': 'Dashboard', 'text': 'Your whole fleet at a glance. Tap the stat cards to filter Running, Idle or Offline vehicles.', 'tab': 0, 'arrow': true},
+    {'icon': Icons.bar_chart, 'title': 'Fleet Activity', 'text': 'See your fleet status breakdown and total distance covered today.', 'tab': 1, 'arrow': true},
+    {'icon': Icons.map, 'title': 'Live Map', 'text': 'Track all your vehicles in real-time. Tap a vehicle for its speed, engine status and expiry. Use the Share button to send a live link.', 'tab': 2, 'arrow': true},
+    {'icon': Icons.notifications, 'title': 'Alerts & Geofence', 'text': 'Create alerts for speed, engine, power cut, and geofence entry/exit. Set up geofence zones here too.', 'tab': 3, 'arrow': true},
+    {'icon': Icons.person, 'title': 'Profile & Store', 'text': 'Manage your account, buy GPS devices, renew your plan, and replay this tour from "How to Use".', 'tab': 4, 'arrow': true},
+    {'icon': Icons.celebration, 'title': 'You\'re all set!', 'text': 'That\'s the tour. Replay it anytime from Profile → How to Use. Happy tracking! 🛰', 'tab': 2, 'arrow': false},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // move to the first step's tab
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onGoToTab(_stops[0]['tab'] as int);
+    });
+  }
 
   Future<void> _finish() async {
     await FeatureTour.markSeen();
@@ -180,6 +191,7 @@ class _FeatureTourState extends State<FeatureTour> {
     Haptics.light();
     if (_i < _stops.length - 1) {
       setState(() => _i++);
+      widget.onGoToTab(_stops[_i]['tab'] as int);
     } else {
       _finish();
     }
@@ -189,68 +201,110 @@ class _FeatureTourState extends State<FeatureTour> {
   Widget build(BuildContext context) {
     final s = _stops[_i];
     final last = _i == _stops.length - 1;
-    final pos = s['pos'] as String;
-    // align the card based on which area the feature lives in
-    Alignment align;
-    switch (pos) {
-      case 'bottom':
-        align = Alignment.bottomCenter;
-        break;
-      case 'right':
-        align = Alignment.centerRight;
-        break;
-      default:
-        align = Alignment.center;
-    }
+    final showArrow = s['arrow'] as bool;
+    final tab = s['tab'] as int;
+    final screenW = MediaQuery.of(context).size.width;
+    // 5 nav items evenly spaced — center of each item
+    final itemCenterX = screenW * (tab + 0.5) / 5;
+
     return Material(
-      color: Colors.black.withOpacity(0.82),
+      color: Colors.black.withOpacity(0.78),
       child: SafeArea(
         child: Stack(children: [
-          // skip
+          // Skip
           Align(
             alignment: Alignment.topRight,
             child: TextButton(onPressed: _finish, child: const Text('Skip', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))),
           ),
-          // card
-          Align(
-            alignment: align,
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Container(
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 30)]),
-                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+          // explanation card (sits above the nav so the arrow can point down to it)
+          Positioned(
+            left: 22, right: 22, bottom: 96,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 30)]),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
                   Container(
-                    width: 56, height: 56,
-                    decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.12), borderRadius: BorderRadius.circular(16)),
-                    child: Icon(s['icon'] as IconData, color: AppColors.teal, size: 28),
+                    width: 48, height: 48,
+                    decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.12), borderRadius: BorderRadius.circular(14)),
+                    child: Icon(s['icon'] as IconData, color: AppColors.teal, size: 25),
                   ),
-                  const SizedBox(height: 16),
-                  Text(s['title'] as String, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 8),
-                  Text(s['text'] as String, style: const TextStyle(fontSize: 14, color: AppColors.ink2, height: 1.5)),
-                  const SizedBox(height: 18),
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    // progress dots
-                    Row(children: List.generate(_stops.length, (i) {
-                      final on = i == _i;
-                      return Container(
-                        margin: const EdgeInsets.only(right: 5),
-                        width: on ? 18 : 6, height: 6,
-                        decoration: BoxDecoration(color: on ? AppColors.teal : AppColors.line, borderRadius: BorderRadius.circular(3)),
-                      );
-                    })),
-                    ElevatedButton(
-                      onPressed: _next,
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11))),
-                      child: Text(last ? 'Done' : 'Next', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    ),
-                  ]),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(s['title'] as String, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
                 ]),
-              ),
+                const SizedBox(height: 12),
+                Text(s['text'] as String, style: const TextStyle(fontSize: 13.5, color: AppColors.ink2, height: 1.5)),
+                const SizedBox(height: 16),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Row(children: List.generate(_stops.length, (i) {
+                    final on = i == _i;
+                    return Container(
+                      margin: const EdgeInsets.only(right: 5),
+                      width: on ? 18 : 6, height: 6,
+                      decoration: BoxDecoration(color: on ? AppColors.teal : AppColors.line, borderRadius: BorderRadius.circular(3)),
+                    );
+                  })),
+                  ElevatedButton(
+                    onPressed: _next,
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11))),
+                    child: Text(last ? 'Done' : 'Next', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ]),
+              ]),
             ),
           ),
+
+          // down-arrow pointing at the active bottom-nav item
+          if (showArrow)
+            Positioned(
+              bottom: 60,
+              left: itemCenterX - 16,
+              child: const _BounceArrow(),
+            ),
+
+          // highlight ring around the active nav item
+          if (showArrow)
+            Positioned(
+              bottom: 2,
+              left: itemCenterX - 30,
+              child: Container(
+                width: 60, height: 56,
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.amber, width: 2.5),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
         ]),
+      ),
+    );
+  }
+}
+
+/// A small bouncing down-arrow used to point at the nav item.
+class _BounceArrow extends StatefulWidget {
+  const _BounceArrow();
+  @override
+  State<_BounceArrow> createState() => _BounceArrowState();
+}
+
+class _BounceArrowState extends State<_BounceArrow> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, __) => Transform.translate(
+        offset: Offset(0, _c.value * 8),
+        child: const Icon(Icons.keyboard_double_arrow_down, color: AppColors.amber, size: 34),
       ),
     );
   }
