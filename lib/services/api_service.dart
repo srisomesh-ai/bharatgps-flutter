@@ -851,6 +851,7 @@ class ApiService {
           'name': name,
           'enable_expiration_date': true,
           'expiration_date': exp,
+          'delete_after_expiration': false,
         }),
       ).timeout(const Duration(seconds: 25));
       return 'host: $host\ndevices sent: $devices\n\n'
@@ -882,6 +883,7 @@ class ApiService {
           'name': name,
           'enable_expiration_date': true,
           'expiration_date': exp,
+          'delete_after_expiration': false,
         }),
       ).timeout(const Duration(seconds: 25));
       if (res.statusCode == 200) {
