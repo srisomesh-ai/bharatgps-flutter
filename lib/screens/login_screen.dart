@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
@@ -245,28 +246,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                         SizedBox(
                                           width: double.infinity,
                                           child: OutlinedButton.icon(
-                                            onPressed: _otpLogin,
-                                            icon: const Icon(Icons.verified_user_outlined, size: 21),
-                                            label: const Text('Login with OTP', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                            onPressed: _getNewGps,
+                                            icon: const Icon(Icons.add_location_alt_outlined, size: 21),
+                                            label: const Text('Get a New GPS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                                             style: OutlinedButton.styleFrom(
                                               foregroundColor: AppColors.teal,
                                               side: const BorderSide(color: AppColors.teal, width: 1.5),
                                               padding: const EdgeInsets.symmetric(vertical: 16),
                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                            ),
-                                          ),
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
-                                          child: Center(
-                                            child: RichText(
-                                              text: const TextSpan(
-                                                style: TextStyle(fontSize: 14, color: Color(0xFF3A4A4A), fontWeight: FontWeight.w500),
-                                                children: [
-                                                  TextSpan(text: "Don't have an account? "),
-                                                  TextSpan(text: 'Sign Up', style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.w700)),
-                                                ],
-                                              ),
                                             ),
                                           ),
                                         ),
@@ -392,8 +379,15 @@ class _LoginScreenState extends State<LoginScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password reset — please contact support or use the web portal')));
   }
 
-  void _otpLogin() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Login with OTP — coming soon')));
+  void _getNewGps() async {
+    final uri = Uri.parse('http://bharatgps.store');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open bharatgps.store')));
+      }
+    }
   }
 }
 
