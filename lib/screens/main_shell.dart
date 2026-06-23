@@ -55,6 +55,7 @@ class _MainShellState extends State<MainShell> {
   void goTo(int i) {
     if (i == _index) return;
     setState(() => _index = i);
+    if (_showTour) FeatureTour.navTapped.value = i;
   }
 
   // switch to the Map tab and tell it which vehicle to focus
@@ -86,17 +87,17 @@ class _MainShellState extends State<MainShell> {
           SystemNavigator.pop();
         }
       },
-      child: Scaffold(
-        body: Stack(children: [
-          IndexedStack(index: _index, children: _pages),
-          if (_showTour)
-            FeatureTour(
-              onDone: () => setState(() => _showTour = false),
-              onGoToTab: (i) => setState(() => _index = i),
-            ),
-        ]),
-        bottomNavigationBar: _BottomBar(current: _index, onTap: goTo),
-      ),
+      child: Stack(children: [
+        Scaffold(
+          body: IndexedStack(index: _index, children: _pages),
+          bottomNavigationBar: _BottomBar(current: _index, onTap: goTo),
+        ),
+        if (_showTour)
+          FeatureTour(
+            onDone: () => setState(() => _showTour = false),
+            onGoToTab: (i) => setState(() => _index = i),
+          ),
+      ]),
     );
   }
 }
