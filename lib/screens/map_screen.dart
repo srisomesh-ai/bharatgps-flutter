@@ -848,26 +848,28 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             const Divider(height: 1, color: AppColors.line),
             _row(Icons.wifi, 'GPS Signal', gps, valColor: gps == 'Strong' ? AppColors.green : AppColors.red),
             const Divider(height: 1, color: AppColors.line),
-            GestureDetector(
-              onLongPress: () async {
-                // long-press the expiry row to see the raw server data (debug)
-                final raw = await ApiService.fetchDeviceExpiryRaw('${widget.device['id']}');
-                if (!context.mounted) return;
-                showDialog(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    title: const Text('Expiry — raw server data'),
-                    content: SingleChildScrollView(child: Text(raw, style: const TextStyle(fontSize: 10))),
-                    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
-                  ),
-                );
-              },
-              child: _row(Icons.event, 'Device Expiry',
-                  _loadingExpiry
-                      ? 'Checking…'
-                      : (_expiryText(u['expiry'] ?? _fetchedExpiry) ?? 'Not set'),
-                  valColor: _expiryColor(u['expiry'] ?? _fetchedExpiry)),
-            ),
+            Builder(builder: (_) {
+              final isExpired = u['expired'] == true;
+              final date = u['expiry'] ?? _fetchedExpiry;
+              // Prefer showing the real date if we ever get one; otherwise show
+              // the Expired/Active status that the API does expose.
+              String label;
+              Color color;
+              if (_loadingExpiry) {
+                label = 'Checking…';
+                color = AppColors.ink2;
+              } else if (date != null && (_expiryText(date) != null)) {
+                label = _expiryText(date)!;
+                color = _expiryColor(date);
+              } else if (isExpired) {
+                label = 'Expired';
+                color = AppColors.red;
+              } else {
+                label = 'Active';
+                color = AppColors.green;
+              }
+              return _row(Icons.event, 'Device Status', label, valColor: color);
+            }),
             const SizedBox(height: 16),
             // actions: Live Track + Playback, then Reports full-width
             Row(children: [
