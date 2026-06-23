@@ -728,6 +728,7 @@ class ApiService {
     int? overspeed,
     int? moveDuration,
     int? ignitionDuration,
+    int? geofenceId,
   }) async {
     // map our friendly types to the GPSWOX server type + extra params
     String serverType = type;
@@ -750,6 +751,10 @@ class ApiService {
         break;
       case 'lowbattery':
         serverType = 'low_battery';
+        break;
+      case 'geofence':
+        serverType = 'geofence_in_out'; // enter/exit a geofence
+        if (geofenceId != null) extra['geofences'] = [geofenceId];
         break;
     }
 
@@ -908,6 +913,105 @@ class ApiService {
 
   /// SHARING — create a public tracking link for a vehicle that expires.
   /// Returns the share hash/url or null on failure.
+  // ===== GEOFENCES =====
+  /// List all geofences (fixed map zones, independent of vehicles).
+  static Future<List<Map<String, dynamic>>> getGeofences() async {
+    try {
+      final res = await http.get(_u(host!, 'get_geofences', {'lang': 'en', 'user_api_hash': hash!}))
+          .timeout(const Duration(seconds: 20));
+      if (res.statusCode != 200) return [];
+      final j = jsonDecode(res.body);
+      List raw = [];
+      if (j is Map) {
+        if (j['items'] is Map && j['items']['geofences'] is List) {
+          raw = j['items']['geofences'];
+        } else if (j['geofences'] is List) {
+          raw = j['geofences'];
+        } else if (j['items'] is List) {
+          raw = j['items'];
+        }
+      }
+      return raw.whereType<Map>().map((g) {
+        final m = Map<String, dynamic>.from(g);
+        // parse coordinates (GPSWOX stores polygon/circle as JSON strings sometimes)
+        return {
+          'id': m['id'],
+          'name': m['name'] ?? 'Geofence',
+          'type': m['type'] ?? (m['radius'] != null ? 'circle' : 'polygon'),
+          'color': m['polygon_color'] ?? m['color'] ?? '#0E5C5C',
+          'radius': double.tryParse('${m['radius'] ?? 0}') ?? 0,
+          'coordinates': m['coordinates'] ?? m['polygon'] ?? m['center'],
+          'active': m['active'],
+          '_raw': m,
+        };
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Create a geofence (circle or polygon). NOT tied to a vehicle — it's a
+  /// fixed zone on the map. Returns the new geofence id or null.
+  static Future<int?> createGeofence({
+    required String name,
+    required String type, // 'circle' | 'polygon'
+    required String color,
+    double? radius,
+    Map<String, double>? center,
+    List<Map<String, double>>? polygon,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'name': name,
+        'active': true,
+        'type': type,
+        'polygon_color': color,
+      };
+      if (type == 'circle') {
+        body['radius'] = radius ?? 200;
+        body['center'] = {'lat': center?['lat'] ?? 0, 'lng': center?['lng'] ?? 0};
+      } else {
+        body['polygon'] = polygon ?? [];
+      }
+      final res = await http.post(
+        _u(host!, 'add_geofence', {'lang': 'en', 'user_api_hash': hash!}),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 25));
+      if (res.statusCode == 200) {
+        final j = jsonDecode(res.body);
+        if (j is Map) {
+          return (j['id'] ?? j['item']?['id']) as int?;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<bool> deleteGeofence(int id) async {
+    try {
+      final res = await http.get(_u(host!, 'destroy_geofence', {'lang': 'en', 'user_api_hash': hash!, 'id': '$id'}))
+          .timeout(const Duration(seconds: 20));
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Raw debug for geofence creation.
+  static Future<String> createGeofenceRaw(Map<String, dynamic> body) async {
+    try {
+      final res = await http.post(
+        _u(host!, 'add_geofence', {'lang': 'en', 'user_api_hash': hash!}),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 25));
+      return 'HTTP ${res.statusCode}\n${res.body}';
+    } catch (e) {
+      return 'ERROR: $e';
+    }
+  }
+
   static Future<Map<String, dynamic>?> createSharing({
     required List<int> devices,
     required String name,
