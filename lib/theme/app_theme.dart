@@ -57,9 +57,11 @@ ThemeData buildTheme() {
 // status helpers
 String stateOf(String? online, num? speed) {
   if (online == 'offline' || online == null) return 'of';
-  if (online == 'online') return 'rn';
-  if (online == 'ack') return 'id';
-  return (speed ?? 0) > 3 ? 'rn' : 'id';
+  // online — but "Running" should mean actually moving, not just connected.
+  // A parked vehicle that's still reporting is Idle, not Running.
+  final spd = speed ?? 0;
+  if (spd > 3) return 'rn'; // genuinely moving
+  return 'id';              // online but stopped/parked = Idle
 }
 
 const stateLabels = {'rn': 'Running', 'id': 'Idle', 'of': 'Offline'};
