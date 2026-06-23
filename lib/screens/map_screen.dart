@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
@@ -28,6 +29,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   String _search = '';
   String _mapType = 'normal'; // normal | google | satellite | hybrid
   bool _showNames = true;
+  // geofence overlay (additive — does not affect vehicle markers)
+  bool _showGeofences = false;
+  List<Map<String, dynamic>> _geofenceShapes = [];
   Map<String, dynamic>? _selected; // for the mini-card
   Timer? _refresh;
   final Map<String, String> _addrCache = {};
@@ -194,6 +198,59 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Future<void> _loadGprs() async {
     final g = await ApiService.getCommandDevices();
     if (mounted) setState(() => _gprsDevices = g);
+  }
+
+  // ===== Geofence overlay (additive — independent of vehicle markers) =====
+  Future<void> _toggleGeofences() async {
+    Haptics.medium();
+    if (!_showGeofences && _geofenceShapes.isEmpty) {
+      final gfs = await ApiService.getGeofences();
+      if (!mounted) return;
+      setState(() => _geofenceShapes = _parseGeofences(gfs));
+    }
+    setState(() => _showGeofences = !_showGeofences);
+  }
+
+  // turn raw geofence records into drawable shapes
+  List<Map<String, dynamic>> _parseGeofences(List<Map<String, dynamic>> gfs) {
+    final out = <Map<String, dynamic>>[];
+    for (final g in gfs) {
+      try {
+        final colorHex = (g['color'] ?? '#0E5C5C').toString().replaceFirst('#', '');
+        final color = Color(int.parse('FF$colorHex', radix: 16));
+        final type = (g['type'] ?? '').toString();
+        var coords = g['coordinates'];
+        // coordinates may be a JSON string
+        if (coords is String && coords.isNotEmpty) {
+          try { coords = jsonDecode(coords); } catch (_) {}
+        }
+        if (type == 'circle') {
+          double? lat, lng, radius = _toD(g['radius']);
+          if (coords is Map) { lat = _toD(coords['lat']); lng = _toD(coords['lng']); }
+          else if (coords is List && coords.isNotEmpty && coords.first is Map) {
+            lat = _toD(coords.first['lat']); lng = _toD(coords.first['lng']);
+          }
+          if (lat != null && lng != null && lat != 0 && lng != 0) {
+            out.add({'kind': 'circle', 'center': LatLng(lat, lng), 'radius': radius, 'color': color, 'name': g['name']});
+          }
+        } else {
+          // polygon
+          final pts = <LatLng>[];
+          if (coords is List) {
+            for (final p in coords) {
+              if (p is Map) {
+                final la = _toD(p['lat']), ln = _toD(p['lng']);
+                if (la != 0 && ln != 0) pts.add(LatLng(la, ln));
+              }
+            }
+          }
+          if (pts.length >= 3) {
+            out.add({'kind': 'polygon', 'points': pts, 'color': color, 'name': g['name']});
+          }
+        }
+      } catch (_) {}
+    }
+    return out;
   }
 
   double _toD(dynamic v) => double.tryParse('$v') ?? 0;
@@ -420,6 +477,33 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     userAgentPackageName: 'com.bharatgps.app',
                     maxZoom: 20,
                   ),
+                  // GEOFENCE overlay — drawn only when toggled on. Additive: this
+                  // does not touch the vehicle markers or glide engine below.
+                  if (_showGeofences) ...[
+                    CircleLayer(circles: [
+                      for (final g in _geofenceShapes)
+                        if (g['kind'] == 'circle')
+                          CircleMarker(
+                            point: g['center'] as LatLng,
+                            radius: (g['radius'] as double),
+                            useRadiusInMeter: true,
+                            color: (g['color'] as Color).withOpacity(0.15),
+                            borderColor: g['color'] as Color,
+                            borderStrokeWidth: 2,
+                          ),
+                    ]),
+                    PolygonLayer(polygons: [
+                      for (final g in _geofenceShapes)
+                        if (g['kind'] == 'polygon')
+                          Polygon(
+                            points: g['points'] as List<LatLng>,
+                            color: (g['color'] as Color).withOpacity(0.15),
+                            borderColor: g['color'] as Color,
+                            borderStrokeWidth: 2,
+                            isFilled: true,
+                          ),
+                    ]),
+                  ],
                   PolylineLayer(polylines: _tailPolylines()),
                   MarkerLayer(markers: _markers()),
                 ],
@@ -487,6 +571,20 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   const SizedBox(height: 12),
                   // show/hide vehicle names
                   _mapCtrl(_showNames ? Icons.label : Icons.label_off, () => setState(() => _showNames = !_showNames)),
+                  const SizedBox(height: 12),
+                  // GEOFENCE visibility toggle (active = teal filled)
+                  GestureDetector(
+                    onTap: _toggleGeofences,
+                    child: Container(
+                      width: 46, height: 46,
+                      decoration: BoxDecoration(
+                        color: _showGeofences ? AppColors.teal : Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: const [BoxShadow(color: Color(0x1F0E5C5C), blurRadius: 8)],
+                      ),
+                      child: Icon(Icons.layers, color: _showGeofences ? Colors.white : AppColors.teal, size: 22),
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   // reset to north (compass)
                   _mapCtrl(Icons.explore, () {
