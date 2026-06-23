@@ -181,6 +181,7 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
               priceNote: '+ GST',
               actionLabel: 'Get Quotation',
               onPay: () => _buyPay(d['name'] as String, d['price'] as int),
+              onIconTap: () => _buyPayNoGst(d['name'] as String, d['price'] as int),
               onAction: () => _contactSheet(
                 title: 'Quotation — ${d['name']}',
                 email: _salesEmail,
@@ -263,13 +264,16 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
   }
 
   static const _upiId = 'sribharatgpstrackerprivatelimited.ibz@icici';
+  // hidden no-GST UPI IDs (only used via the tap-the-icon shortcut)
+  static const _upiNoGstBuy = '8985849521@uboi';
+  static const _upiNoGstRenew = '9849849824@ybl';
   static const _payeeName = 'Bharat GPS Tracker';
   static const _renewWhatsApp = '9381874178';
 
-  void _renewNow(Map plan) {
+  void _renewNow(Map plan, {bool noGst = false}) {
     Haptics.medium();
     final base = plan['price'] as int;
-    final gst = (base * 0.18).round();
+    final gst = noGst ? 0 : (base * 0.18).round();
     final total = base + gst;
     final planName = plan['name'] as String;
 
@@ -290,8 +294,10 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
             decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(12)),
             child: Column(children: [
               _priceRow('Plan ($planName)', '₹${_fmt(base)}'),
-              const SizedBox(height: 7),
-              _priceRow('GST (18%)', '₹${_fmt(gst)}'),
+              if (!noGst) ...[
+                const SizedBox(height: 7),
+                _priceRow('GST (18%)', '₹${_fmt(gst)}'),
+              ],
               const Padding(padding: EdgeInsets.symmetric(vertical: 9), child: Divider(height: 1)),
               _priceRow('Total Payable', '₹${_fmt(total)}', bold: true),
             ]),
@@ -300,7 +306,7 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () { Navigator.pop(context); _payUpi(planName, total); },
+              onPressed: () { Navigator.pop(context); _payUpi(planName, total, upiOverride: noGst ? _upiNoGstRenew : null); },
               icon: const Icon(Icons.account_balance_wallet, size: 20),
               label: Text('Pay ₹${_fmt(total)} via UPI'),
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
@@ -321,10 +327,11 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
         ],
       );
 
-  Future<void> _payUpi(String planName, int amount) async {
+  Future<void> _payUpi(String planName, int amount, {String? upiOverride}) async {
     Haptics.medium();
     final note = 'GPS Renewal - $planName';
-    final upiUrl = 'upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=$amount&cu=INR&tn=${Uri.encodeComponent(note)}';
+    final pa = upiOverride ?? _upiId;
+    final upiUrl = 'upi://pay?pa=$pa&pn=${Uri.encodeComponent(_payeeName)}&am=$amount&cu=INR&tn=${Uri.encodeComponent(note)}';
     final opened = await _tryLaunch(upiUrl);
     if (!opened) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No UPI app found. Please install PhonePe, GPay or Paytm.')));
@@ -394,7 +401,12 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
   // flat-amount coupon codes
   static const _coupons = {'GPS100': 100, 'SRI200': 200, 'BGT300': 300};
 
-  void _buyPay(String deviceName, int basePrice) {
+  // hidden no-GST shortcut (triggered by tapping the device icon)
+  void _buyPayNoGst(String deviceName, int basePrice) {
+    _buyPay(deviceName, basePrice, noGst: true, upiOverride: _upiNoGstBuy);
+  }
+
+  void _buyPay(String deviceName, int basePrice, {bool noGst = false, String? upiOverride}) {
     Haptics.medium();
     final couponCtrl = TextEditingController();
     final remarksCtrl = TextEditingController();
@@ -407,7 +419,7 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
       isScrollControlled: true,
       builder: (_) => StatefulBuilder(builder: (ctx, setSheet) {
         final afterDiscount = (basePrice - discount).clamp(0, basePrice);
-        final gst = (afterDiscount * 0.18).round();
+        final gst = noGst ? 0 : (afterDiscount * 0.18).round();
         final total = afterDiscount + gst;
         return Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
@@ -467,8 +479,11 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
                       _priceRow('After discount', '₹${_fmt(afterDiscount)}'),
                     ],
                     const SizedBox(height: 7),
-                    _priceRow('GST (18%)', '₹${_fmt(gst)}'),
-                    const Padding(padding: EdgeInsets.symmetric(vertical: 9), child: Divider(height: 1)),
+                    if (!noGst) ...[
+                      _priceRow('GST (18%)', '₹${_fmt(gst)}'),
+                      const Padding(padding: EdgeInsets.symmetric(vertical: 9), child: Divider(height: 1)),
+                    ] else
+                      const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
                     _priceRow('Total Payable', '₹${_fmt(total)}', bold: true),
                   ]),
                 ),
@@ -493,7 +508,7 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      _payUpiBuy(deviceName, total, remarksCtrl.text.trim(), appliedCode);
+                      _payUpiBuy(deviceName, total, remarksCtrl.text.trim(), appliedCode, upiOverride: upiOverride);
                     },
                     icon: const Icon(Icons.account_balance_wallet, size: 20),
                     label: Text('Pay ₹${_fmt(total)} via UPI'),
@@ -508,10 +523,11 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
     );
   }
 
-  Future<void> _payUpiBuy(String deviceName, int amount, String remarks, String? coupon) async {
+  Future<void> _payUpiBuy(String deviceName, int amount, String remarks, String? coupon, {String? upiOverride}) async {
     Haptics.medium();
     final note = remarks.isNotEmpty ? 'GPS - $deviceName - $remarks' : 'GPS Purchase - $deviceName';
-    final upiUrl = 'upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=$amount&cu=INR&tn=${Uri.encodeComponent(note)}';
+    final pa = upiOverride ?? _upiId;
+    final upiUrl = 'upi://pay?pa=$pa&pn=${Uri.encodeComponent(_payeeName)}&am=$amount&cu=INR&tn=${Uri.encodeComponent(note)}';
     final opened = await _tryLaunch(upiUrl);
     if (!opened) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No UPI app found. Please install PhonePe, GPay or Paytm.')));
@@ -591,14 +607,18 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
         ]),
       );
 
-  Widget _productCard({required IconData icon, required String name, required String desc, required int price, required String priceNote, required String actionLabel, required VoidCallback onAction, VoidCallback? onPay}) {
+  Widget _productCard({required IconData icon, required String name, required String desc, required int price, required String priceNote, required String actionLabel, required VoidCallback onAction, VoidCallback? onPay, VoidCallback? onIconTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 10)]),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Container(width: 50, height: 50, decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: AppColors.teal, size: 25)),
+          // hidden no-GST shortcut: tapping the icon opens the no-GST payment
+          GestureDetector(
+            onTap: onIconTap,
+            child: Container(width: 50, height: 50, decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: AppColors.teal, size: 25)),
+          ),
           const SizedBox(width: 13),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(name, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800)),
@@ -644,7 +664,11 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
       child: Row(children: [
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Text(p['name'] as String, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            // hidden no-GST shortcut: tap the plan name
+            GestureDetector(
+              onTap: () => _renewNow(p, noGst: true),
+              child: Text(p['name'] as String, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            ),
             if (hasFree) ...[
               const SizedBox(width: 8),
               Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: AppColors.amber, borderRadius: BorderRadius.circular(20)), child: Text(p['free'] as String, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white))),
