@@ -793,9 +793,16 @@ class ApiService {
         serverType = 'low_battery';
         break;
       case 'geofence':
-        // GPSWOX geofence alert types: geofence_in / geofence_out / geofence_in_out
+        // Server only supports geofence_in and geofence_out (no combined type).
+        // For "Both", we create two alerts below. Field is `geofences` (multiselect).
         final dir = geofenceDirection ?? 'in_out';
-        serverType = dir == 'in' ? 'geofence_in' : (dir == 'out' ? 'geofence_out' : 'geofence_in_out');
+        if (dir == 'in_out') {
+          // create both an enter and an exit alert
+          final inOk = await createAlert(type: 'geofence', name: '$name (Enter)', devices: devices, geofenceId: geofenceId, geofenceDirection: 'in');
+          final outOk = await createAlert(type: 'geofence', name: '$name (Exit)', devices: devices, geofenceId: geofenceId, geofenceDirection: 'out');
+          return inOk || outOk;
+        }
+        serverType = dir == 'in' ? 'geofence_in' : 'geofence_out';
         if (geofenceId != null) extra['geofences'] = [geofenceId];
         break;
     }
@@ -957,6 +964,36 @@ class ApiService {
   /// Returns the share hash/url or null on failure.
   // ===== GEOFENCES =====
   /// List all geofences (fixed map zones, independent of vehicles).
+  /// Reliable geofence list for the alert picker — read from
+  /// get_alerts_attributes (geofence_in → geofences → options), which is the
+  /// exact list the server accepts for geofence alerts.
+  static Future<List<Map<String, dynamic>>> getGeofenceOptions() async {
+    try {
+      final res = await http.get(_u(host!, 'get_alerts_attributes', {'lang': 'en', 'user_api_hash': hash!}))
+          .timeout(const Duration(seconds: 20));
+      if (res.statusCode != 200) return [];
+      final j = jsonDecode(res.body);
+      final types = (j is Map) ? j['types'] : null;
+      List opts = [];
+      if (types is Map && types['geofence_in'] is List) {
+        for (final field in types['geofence_in']) {
+          if (field is Map && field['name'] == 'geofences' && field['options'] is List) {
+            opts = field['options'];
+            break;
+          }
+        }
+      }
+      return opts.whereType<Map>().map((o) => {
+        'id': o['id'],
+        'name': o['title'] ?? 'Geofence',
+        'color': '#0E5C5C',
+        'type': 'circle',
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> getGeofences() async {
     try {
       final res = await http.get(_u(host!, 'get_geofences', {'lang': 'en', 'user_api_hash': hash!}))
