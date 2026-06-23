@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'tour_keys.dart';
 import 'main_shell.dart';
 import '../services/api_service.dart';
 import 'store_screen.dart';
@@ -212,7 +213,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _menu(Icons.person_outline, 'Account Information', 'View your account details', onTap: _showAccountInfo),
                         _menu(Icons.business_outlined, 'Company Information', 'Manage company details'),
                         _menu(Icons.group_outlined, 'User Management', 'Manage users and permissions'),
-                        _menu(Icons.storefront, 'Store & Services', 'Buy GPS, renew plans, request services', onTap: () { Haptics.light(); Navigator.push(context, MaterialPageRoute(builder: (_) => const StoreScreen())); }),
+                        KeyedSubtree(key: TourKeys.profileStore, child: _menu(Icons.storefront, 'Store & Services', 'Buy GPS, renew plans, request services', onTap: () { Haptics.light(); Navigator.push(context, MaterialPageRoute(builder: (_) => const StoreScreen())); })),
                         _menu(Icons.help_center_outlined, 'How to Use', 'Replay the app feature tour', onTap: () async {
                           Haptics.light();
                           await FeatureTour.replay();
