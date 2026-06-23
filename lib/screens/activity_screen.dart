@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'tour_keys.dart';
 import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
 import 'history_map_screen.dart';
@@ -89,6 +90,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     children: [
                       // Fleet status breakdown (running / idle / offline at a glance)
                       Container(
+                        key: TourKeys.activityStatus,
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Color(0x0F0E5C5C), blurRadius: 10)]),
                         child: Column(children: [
