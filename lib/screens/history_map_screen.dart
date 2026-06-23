@@ -110,7 +110,7 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
 
   String _fmtTime(dynamic t) {
     if (t == null) return '—';
-    final dt = DateTime.tryParse(t.toString().replaceFirst(' ', 'T'));
+    final dt = ApiService.parseTs(t);
     if (dt == null) return t.toString();
     return DateFormat('dd MMM, hh:mm a').format(dt);
   }
@@ -180,7 +180,7 @@ class _HistoryMapScreenState extends State<HistoryMapScreen> {
   }
 
   String _clock(dynamic t) {
-    final d = DateTime.tryParse(t.toString().replaceFirst(' ', 'T'));
+    final d = ApiService.parseTs(t);
     return d != null ? DateFormat('hh:mm a').format(d) : '—';
   }
 
