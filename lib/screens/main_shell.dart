@@ -90,7 +90,10 @@ class _MainShellState extends State<MainShell> {
         body: Stack(children: [
           IndexedStack(index: _index, children: _pages),
           if (_showTour)
-            FeatureTour(onDone: () => setState(() => _showTour = false)),
+            FeatureTour(
+              onDone: () => setState(() => _showTour = false),
+              onGoToTab: (i) => setState(() => _index = i),
+            ),
         ]),
         bottomNavigationBar: _BottomBar(current: _index, onTap: goTo),
       ),
