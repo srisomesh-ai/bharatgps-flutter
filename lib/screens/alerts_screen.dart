@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import 'geofence_screen.dart';
 import '../services/notification_service.dart';
 import '../widgets/bottom_nav.dart';
 
@@ -121,11 +122,31 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
       floatingActionButton: AnimatedBuilder(
         animation: _tab,
         builder: (_, __) => _tab.index == 0
-            ? FloatingActionButton.extended(
-                backgroundColor: AppColors.teal,
-                onPressed: _openCreate,
-                icon: const Icon(Icons.add),
-                label: const Text('Create'),
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  FloatingActionButton.extended(
+                    heroTag: 'geofenceFab',
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.teal,
+                    elevation: 3,
+                    onPressed: () {
+                      Haptics.medium();
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const GeofenceScreen()));
+                    },
+                    icon: const Icon(Icons.layers),
+                    label: const Text('Geofence', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                  const SizedBox(height: 12),
+                  FloatingActionButton.extended(
+                    heroTag: 'createFab',
+                    backgroundColor: AppColors.teal,
+                    onPressed: _openCreate,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Create'),
+                  ),
+                ],
               )
             : const SizedBox.shrink(),
       ),
@@ -360,7 +381,24 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
     {'t': 'offline', 'name': 'Offline', 'sub': 'Device stops reporting', 'icon': Icons.wifi_off, 'color': AppColors.red, 'bg': AppColors.redBg},
     {'t': 'powercut', 'name': 'Power Cut', 'sub': 'GPS unplugged', 'icon': Icons.flash_on, 'color': AppColors.orange, 'bg': AppColors.orangeBg},
     {'t': 'lowbattery', 'name': 'Low Battery', 'sub': 'Below threshold', 'icon': Icons.battery_alert, 'color': AppColors.violet, 'bg': AppColors.violetBg},
+    {'t': 'geofence', 'name': 'Geofence', 'sub': 'Enter / exit a zone', 'icon': Icons.layers, 'color': AppColors.teal, 'bg': AppColors.bg},
   ];
+
+  // geofences loaded when the Geofence type is chosen
+  List<Map<String, dynamic>> _geofences = [];
+  int? _selectedGeofenceId;
+  bool _loadingGeofences = false;
+
+  Future<void> _loadGeofencesForAlert() async {
+    setState(() => _loadingGeofences = true);
+    final gfs = await ApiService.getGeofences();
+    if (!mounted) return;
+    setState(() {
+      _geofences = gfs;
+      _loadingGeofences = false;
+      if (gfs.isNotEmpty) _selectedGeofenceId = gfs.first['id'] as int?;
+    });
+  }
 
   String get _thrLabel {
     switch (_type) {
@@ -381,11 +419,15 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
 
   String get _thrUnit => _type == 'overspeed' ? 'km/h' : (_type == 'lowbattery' ? '%' : 'min');
   // engine on/off and power cut are event-based — no threshold needed
-  bool get _hasThreshold => _type != 'powercut' && _type != 'engine_on' && _type != 'engine_off';
+  bool get _hasThreshold => _type != 'powercut' && _type != 'engine_on' && _type != 'engine_off' && _type != 'geofence';
 
   Future<void> _create() async {
     if (_selected.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select at least one vehicle')));
+      return;
+    }
+    if (_type == 'geofence' && _selectedGeofenceId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a geofence')));
       return;
     }
     setState(() => _creating = true);
@@ -398,6 +440,7 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
       overspeed: _type == 'overspeed' ? thr : null,
       moveDuration: _type == 'move_duration' ? thr : (_type == 'offline' ? thr : null),
       ignitionDuration: _type == 'ignition_duration' ? thr : null,
+      geofenceId: _type == 'geofence' ? _selectedGeofenceId : null,
     );
     if (!mounted) return;
     setState(() => _creating = false);
@@ -444,7 +487,11 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
                 children: _types.map((ty) {
                   final sel = _type == ty['t'];
                   return GestureDetector(
-                    onTap: () { Haptics.select(); setState(() => _type = ty['t'] as String); },
+                    onTap: () {
+                      Haptics.select();
+                      setState(() => _type = ty['t'] as String);
+                      if (ty['t'] == 'geofence' && _geofences.isEmpty) _loadGeofencesForAlert();
+                    },
                     child: Container(
                       decoration: BoxDecoration(
                         color: sel ? const Color(0xFFF1F8F7) : Colors.white,
@@ -482,8 +529,49 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
                   ]),
                 ),
               ],
+              if (_type == 'geofence') ...[
+                const SizedBox(height: 16),
+                const Text('SELECT GEOFENCE', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink2, letterSpacing: 0.4)),
+                const SizedBox(height: 10),
+                if (_loadingGeofences)
+                  const Padding(padding: EdgeInsets.all(12), child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))))
+                else if (_geofences.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(13),
+                    decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(12)),
+                    child: Row(children: [
+                      const Expanded(child: Text('No geofences yet. Create one first.', style: TextStyle(fontSize: 12.5, color: AppColors.ink2))),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const GeofenceScreen()));
+                        },
+                        child: const Text('Create'),
+                      ),
+                    ]),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 13),
+                    decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(12)),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        isExpanded: true,
+                        value: _selectedGeofenceId,
+                        items: _geofences.map((g) => DropdownMenuItem<int>(
+                          value: g['id'] as int,
+                          child: Row(children: [
+                            Container(width: 12, height: 12, decoration: BoxDecoration(color: Color(int.parse('FF${(g['color'] as String).replaceFirst('#', '')}', radix: 16)), shape: BoxShape.circle)),
+                            const SizedBox(width: 10),
+                            Text(g['name'] as String),
+                          ]),
+                        )).toList(),
+                        onChanged: (v) => setState(() => _selectedGeofenceId = v),
+                      ),
+                    ),
+                  ),
+              ],
               const SizedBox(height: 16),
-              // ===== ALERT SOUND PICKER (language categories + audios) =====
               const Text('ALERT SOUND', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink2, letterSpacing: 0.4)),
               const SizedBox(height: 10),
               // category tabs: Default / English / Hindi / Telugu / Other Tones
