@@ -851,14 +851,13 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
             Builder(builder: (_) {
               final isExpired = u['expired'] == true;
               final date = u['expiry'] ?? _fetchedExpiry;
-              // Prefer showing the real date if we ever get one; otherwise show
-              // the Expired/Active status that the API does expose.
               String label;
               Color color;
-              if (_loadingExpiry) {
+              if (_loadingExpiry && date == null) {
                 label = 'Checking…';
                 color = AppColors.ink2;
-              } else if (date != null && (_expiryText(date) != null)) {
+              } else if (date != null && _expiryText(date) != null) {
+                // real expiry date available
                 label = _expiryText(date)!;
                 color = _expiryColor(date);
               } else if (isExpired) {
@@ -868,7 +867,7 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
                 label = 'Active';
                 color = AppColors.green;
               }
-              return _row(Icons.event, 'Device Status', label, valColor: color);
+              return _row(Icons.event, 'Device Expiry', label, valColor: color);
             }),
             const SizedBox(height: 16),
             // actions: Live Track + Playback, then Reports full-width
