@@ -100,7 +100,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       _animPos[id] = np;
       // drop tail breadcrumbs while gliding (only for moving vehicles)
       final dev = _devices.firstWhere((e) => '${e['id']}' == id, orElse: () => {});
-      final moving = dev.isNotEmpty && stateOf(dev['online'], dev['speed']) == 'rn';
+      final moving = dev.isNotEmpty && stableStateFor('${dev['id']}', dev['online'], dev['speed']) == 'rn';
       if (moving && dropNow) {
         final t = _tail.putIfAbsent(id, () => []);
         if (t.isEmpty || t.last != np) {
@@ -154,7 +154,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       _animPos[id] = jump ? target : (_animPos[id] ?? target);
       _heading[id] = _toD(u['course']).toDouble();
       // reset tail if vehicle is not moving OR jumped
-      final moving = stateOf(u['online'], u['speed']) == 'rn';
+      final moving = stableStateFor(id, u['online'], u['speed']) == 'rn';
       if (!moving || jump) _tail[id] = [];
     }
     _glideStartMs = DateTime.now().millisecondsSinceEpoch;
@@ -285,7 +285,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             child: ListView(
               shrinkWrap: true,
               children: _devices.map((u) {
-                final s = stateOf(u['online'], u['speed']);
+                final s = stableStateFor('${u['id']}', u['online'], u['speed']);
                 return InkWell(
                   onTap: () {
                     Navigator.pop(context);
@@ -358,7 +358,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   List<Marker> _markers() {
     final visible = _visibleDevices(needLatLng: true);
     return visible.map((u) {
-      final s = stateOf(u['online'], u['speed']);
+      final s = stableStateFor('${u['id']}', u['online'], u['speed']);
       final id = '${u['id']}';
       final pos = _animPos[id] ?? LatLng(_toD(u['lat']), _toD(u['lng']));
       final heading = _heading[id] ?? _toD(u['course']).toDouble();
@@ -612,7 +612,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   Widget _miniCard(Map<String, dynamic> u) {
-    final s = stateOf(u['online'], u['speed']);
+    final s = stableStateFor('${u['id']}', u['online'], u['speed']);
     final addr = (u['address'] ?? '').toString().isNotEmpty ? u['address'].toString() : '${u['lat']}, ${u['lng']}';
     final gps = s == 'of' ? 'Lost' : 'Strong';
     return Positioned(
@@ -883,7 +883,7 @@ class _VehicleDetailSheetState extends State<_VehicleDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final u = widget.device;
-    final s = stateOf(u['online'], u['speed']);
+    final s = stableStateFor('${u['id']}', u['online'], u['speed']);
     final addr = (u['address'] ?? '').toString().isNotEmpty ? u['address'].toString() : '${u['lat']}, ${u['lng']}';
     final gps = s == 'of' ? 'Lost' : 'Strong';
     return Container(
