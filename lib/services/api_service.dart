@@ -471,17 +471,30 @@ class ApiService {
 
       // try to extract expiration from get_devices_latest
       String latestExp = '(not found)';
+      String deviceDataDump = '(no device_data)';
       try {
         final lj = jsonDecode(latest.body);
-        final found = _deepFindAnyKey(lj, 'expiration_date');
-        latestExp = found?.toString() ?? '(none)';
-      } catch (_) {}
+        final items = (lj is Map && lj['items'] is List) ? lj['items'] as List : [];
+        if (items.isNotEmpty) {
+          final first = items.first;
+          if (first is Map) {
+            final dd = first['device_data'];
+            if (dd is Map) {
+              deviceDataDump = jsonEncode(dd);
+              latestExp = '${dd['expiration_date']}';
+            } else {
+              deviceDataDump = 'device_data missing. top-level keys: ${first.keys.toList()}';
+            }
+          }
+        }
+      } catch (e) {
+        deviceDataDump = 'parse error: $e';
+      }
 
       return 'host: $host\n\n'
-          '=== get_devices_latest expiration_date: $latestExp ===\n'
-          'HTTP ${latest.statusCode}\n${latest.body.length > 1200 ? latest.body.substring(0, 1200) : latest.body}\n\n'
-          '=== USER ===\nexpiry: ${ud?['expiration_date']}  days_left: ${ud?['days_left']}\n\n'
-          '=== edit_device_data HTTP ${res.statusCode} ===\n${res.body.length > 600 ? res.body.substring(0, 600) : res.body}';
+          '=== get_devices_latest → device_data.expiration_date: $latestExp ===\n\n'
+          'DEVICE_DATA:\n$deviceDataDump\n\n'
+          '=== USER expiry: ${ud?['expiration_date']}  days_left: ${ud?['days_left']} ===';
     } catch (e) {
       return 'ERROR: $e';
     }
@@ -510,32 +523,30 @@ class ApiService {
   }
 
   static Future<String?> fetchDeviceExpiry(String deviceId) async {
+    // get_devices_latest returns device_data.expiration_date and (unlike
+    // edit_device_data) does NOT require admin permission.
     try {
-      final res = await http.get(_u(host!, 'edit_device_data', {
+      final res = await http.get(_u(host!, 'get_devices_latest', {
         'lang': 'en',
         'user_api_hash': hash!,
-        'device_id': deviceId,
+        'filter[id]': deviceId,
       })).timeout(const Duration(seconds: 20));
-      if (res.statusCode != 200) return null;
-      final j = jsonDecode(res.body);
-      if (j is! Map) return null;
-
-      // 1) try the obvious spots first
-      final item = (j['item'] is Map) ? Map<String, dynamic>.from(j['item']) : <String, dynamic>{};
-      final direct = [
-        item['expiration_date'],
-        j['expiration_date'],
-        item['sim_expiration_date'],
-        item['expires_date'],
-      ];
-      for (final c in direct) {
-        final v = _validExpiry(c);
-        if (v != null) return v;
+      if (res.statusCode == 200) {
+        final j = jsonDecode(res.body);
+        final items = (j is Map && j['items'] is List) ? j['items'] as List : [];
+        for (final it in items) {
+          if (it is Map) {
+            final dd = it['device_data'];
+            if (dd is Map) {
+              final v = _validExpiry(dd['expiration_date']);
+              if (v != null) return v;
+            }
+            // some servers may put it at top level
+            final v2 = _validExpiry(it['expiration_date']);
+            if (v2 != null) return v2;
+          }
+        }
       }
-
-      // 2) deep-scan the whole response for any "expir" key with a real date
-      final found = _deepFindExpiry(j);
-      if (found != null) return found;
     } catch (_) {}
     return null;
   }
