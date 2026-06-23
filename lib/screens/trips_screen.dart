@@ -212,11 +212,14 @@ class _TripsScreenState extends State<TripsScreen> {
   Widget _tripCard(Map<String, dynamic> t, bool isLive) {
     return GestureDetector(
       onTap: () {
+        Haptics.light();
         // open the route playback for this trip's window
-        final start = DateTime.tryParse('${t['start']}'.replaceFirst(' ', 'T'));
-        final end = DateTime.tryParse('${t['end']}'.replaceFirst(' ', 'T'));
+        final start = ApiService.parseTs(t['start']);
+        final end = ApiService.parseTs(t['end']);
         if (start != null && end != null) {
           Navigator.push(context, MaterialPageRoute(builder: (_) => HistoryMapScreen(device: widget.device, from: start, to: end)));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open this trip')));
         }
       },
       child: Container(
@@ -255,6 +258,14 @@ class _TripsScreenState extends State<TripsScreen> {
               _miniStat(Icons.timer_outlined, _dur(t['duration_min']), 'Time'),
             ]),
           ),
+          const SizedBox(height: 8),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
+            Icon(Icons.map_outlined, size: 13, color: AppColors.teal),
+            SizedBox(width: 5),
+            Text('Tap to view route on map', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.teal)),
+            SizedBox(width: 3),
+            Icon(Icons.chevron_right, size: 15, color: AppColors.teal),
+          ]),
         ]),
       ),
     );
