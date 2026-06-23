@@ -393,7 +393,7 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
 
   Future<void> _loadGeofencesForAlert() async {
     setState(() => _loadingGeofences = true);
-    final gfs = await ApiService.getGeofences();
+    final gfs = await ApiService.getGeofenceOptions();
     if (!mounted) return;
     setState(() {
       _geofences = gfs;
