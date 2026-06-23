@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'tour_keys.dart';
 import 'main_shell.dart';
 import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
@@ -101,26 +102,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // ===== STATS =====
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-            child: Row(children: [
-              _stat('Total', total, 'All vehicles', AppColors.teal, Icons.local_shipping, ''),
-              const SizedBox(width: 9),
-              _stat('Running', run, pct(run), AppColors.green, Icons.play_arrow, 'rn'),
-              const SizedBox(width: 9),
-              _stat('Idle', idle, pct(idle), AppColors.orange, Icons.pause, 'id'),
-              const SizedBox(width: 9),
-              _stat('Offline', off, pct(off), AppColors.red, Icons.stop, 'of'),
-            ]),
+            child: KeyedSubtree(
+              key: TourKeys.dashStats,
+              child: Row(children: [
+                _stat('Total', total, 'All vehicles', AppColors.teal, Icons.local_shipping, ''),
+                const SizedBox(width: 9),
+                _stat('Running', run, pct(run), AppColors.green, Icons.play_arrow, 'rn'),
+                const SizedBox(width: 9),
+                _stat('Idle', idle, pct(idle), AppColors.orange, Icons.pause, 'id'),
+                const SizedBox(width: 9),
+                _stat('Offline', off, pct(off), AppColors.red, Icons.stop, 'of'),
+              ]),
+            ),
           ),
           // ===== My Vehicles + Live =====
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
-            child: Row(children: [
-              const Text('My Vehicles', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-              const Spacer(),
-              Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle)),
-              const SizedBox(width: 6),
-              const Text('Live', style: TextStyle(color: AppColors.green, fontSize: 13, fontWeight: FontWeight.w700)),
-            ]),
+            child: KeyedSubtree(
+              key: TourKeys.dashList,
+              child: Row(children: [
+                const Text('My Vehicles', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                const Spacer(),
+                Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle)),
+                const SizedBox(width: 6),
+                const Text('Live', style: TextStyle(color: AppColors.green, fontSize: 13, fontWeight: FontWeight.w700)),
+              ]),
+            ),
           ),
           // ===== LIST =====
           Expanded(
