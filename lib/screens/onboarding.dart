@@ -173,29 +173,34 @@ class _TourStep {
   const _TourStep({required this.tab, this.key, required this.emoji, required this.title, required this.text, this.round = false});
 }
 
+class _TourStep {
+  final int tab;
+  final GlobalKey? key;
+  final String emoji;
+  final String title;
+  final String text;
+  final bool round;
+  const _TourStep({required this.tab, this.key, required this.emoji, required this.title, required this.text, this.round = false});
+}
+
 class _FeatureTourState extends State<FeatureTour> {
   int _i = 0;
   Rect? _targetRect;
 
   late final List<_TourStep> _steps = [
-    // DASHBOARD (tab 0)
     _TourStep(tab: 0, key: null, emoji: '🏠', title: 'Dashboard', text: 'Your home base — a live overview of your entire fleet at a glance.'),
     _TourStep(tab: 0, key: TourKeys.dashStats, emoji: '🎯', title: 'Quick Filters', text: 'Tap a card to filter Running, Idle or Offline vehicles instantly.'),
     _TourStep(tab: 0, key: TourKeys.dashList, emoji: '🚚', title: 'Vehicle List', text: 'Tap any vehicle to jump straight to it on the live map.'),
-    // ACTIVITY (tab 1)
     _TourStep(tab: 1, key: TourKeys.activityStatus, emoji: '📊', title: 'Fleet Activity', text: 'Your fleet status breakdown and total distance covered today.'),
-    // MAP (tab 2)
     _TourStep(tab: 2, key: null, emoji: '🗺️', title: 'Live Map', text: 'All your vehicles update here in real-time with direction and speed. Tap a vehicle for full details.'),
     _TourStep(tab: 2, key: TourKeys.mapTypes, emoji: '🗂️', title: 'Map Type', text: 'Switch between Map, Satellite and Hybrid views.'),
     _TourStep(tab: 2, key: TourKeys.mapLocate, emoji: '📍', title: 'Locate', text: 'Center the map on your vehicles.', round: true),
     _TourStep(tab: 2, key: TourKeys.mapShare, emoji: '📤', title: 'Share Tracking', text: 'Send a live tracking link on WhatsApp — it expires automatically.', round: true),
     _TourStep(tab: 2, key: TourKeys.mapNames, emoji: '🏷️', title: 'Names', text: 'Show or hide vehicle name labels.', round: true),
     _TourStep(tab: 2, key: TourKeys.mapGeofence, emoji: '▦', title: 'Geofence Zones', text: 'Toggle your saved geofence zones on the map.', round: true),
-    // ALERTS (tab 3)
     _TourStep(tab: 3, key: null, emoji: '🔔', title: 'Alerts', text: 'All your alerts and their history. Get notified for speed, engine, power cut and more.'),
     _TourStep(tab: 3, key: TourKeys.alertsGeofence, emoji: '▦', title: 'Geofence', text: 'Create map zones to alert on entry or exit.'),
     _TourStep(tab: 3, key: TourKeys.alertsCreate, emoji: '➕', title: 'Create Alert', text: 'Make a new alert — speed, engine, power cut, geofence and more.'),
-    // PROFILE (tab 4)
     _TourStep(tab: 4, key: null, emoji: '👤', title: 'Profile', text: 'Your account, plan and days remaining.'),
     _TourStep(tab: 4, key: TourKeys.profileStore, emoji: '🛒', title: 'Store & Renew', text: 'Buy GPS devices, request services, and renew your plan via UPI.'),
     _TourStep(tab: 4, key: null, emoji: '🎉', title: "You're all set!", text: 'Replay this tour anytime from Profile → How to Use. Happy tracking!'),
@@ -212,27 +217,22 @@ class _FeatureTourState extends State<FeatureTour> {
     widget.onDone();
   }
 
-  // switch to the step's tab, wait for the screen to build, then measure target
   Future<void> _goToStep(int i) async {
-    final step = _steps[i];
-    widget.onGoToTab(step.tab);
-    // give the destination screen a moment to build & lay out
+    widget.onGoToTab(_steps[i].tab);
     await Future.delayed(const Duration(milliseconds: 350));
     if (!mounted) return;
     _measure();
   }
 
   void _measure() {
-    final step = _steps[_i];
+    final key = _steps[_i].key;
     Rect? rect;
-    final key = step.key;
     if (key != null) {
       final ctx = key.currentContext;
       if (ctx != null) {
         final box = ctx.findRenderObject() as RenderBox?;
         if (box != null && box.hasSize) {
-          final pos = box.localToGlobal(Offset.zero);
-          rect = pos & box.size;
+          rect = box.localToGlobal(Offset.zero) & box.size;
         }
       }
     }
@@ -242,7 +242,7 @@ class _FeatureTourState extends State<FeatureTour> {
   void _next() {
     Haptics.light();
     if (_i < _steps.length - 1) {
-      setState(() { _i++; _targetRect = null; });
+      setState(() { _i++; });
       _goToStep(_i);
     } else {
       _finish();
@@ -252,7 +252,7 @@ class _FeatureTourState extends State<FeatureTour> {
   void _prev() {
     if (_i > 0) {
       Haptics.light();
-      setState(() { _i--; _targetRect = null; });
+      setState(() { _i--; });
       _goToStep(_i);
     }
   }
@@ -262,93 +262,144 @@ class _FeatureTourState extends State<FeatureTour> {
     final s = _steps[_i];
     final last = _i == _steps.length - 1;
     final size = MediaQuery.of(context).size;
+    final topPad = MediaQuery.of(context).padding.top;
     final r = _targetRect;
     const pad = 7.0;
-    final hole = (r == null) ? null : Rect.fromLTRB(r.left - pad, r.top - pad, r.right + pad, r.bottom + pad);
+    // when no target, use an off-screen tiny rect (centered intro card)
+    final hole = (r == null)
+        ? Rect.fromLTWH(size.width / 2 - 0.5, -60, 1, 1)
+        : Rect.fromLTRB(r.left - pad, r.top - pad, r.right + pad, r.bottom + pad);
+    final hasTarget = r != null;
+
+    // tooltip geometry (matches HTML: width 210, nub 14)
+    const tipW = 220.0;
+    final tipH = 128.0;
+    // decide tooltip side
+    String side; // 'left','below','above','center'
+    if (!hasTarget) {
+      side = 'center';
+    } else if (hole.right > size.width - 70) {
+      side = 'left'; // right-edge map controls -> tooltip to the left
+    } else if (size.height - hole.bottom > tipH + 30) {
+      side = 'below';
+    } else {
+      side = 'above';
+    }
+
+    double tipLeft, tipTop;
+    double nubLeft = 0, nubTop = 0; bool nubShow = true;
+    switch (side) {
+      case 'left':
+        tipLeft = hole.left - tipW - 16;
+        tipTop = hole.center.dy - tipH / 2;
+        nubLeft = tipW - 7; nubTop = tipH / 2 - 7; // nub on right edge of tip
+        break;
+      case 'below':
+        tipLeft = hole.center.dx - tipW / 2;
+        tipTop = hole.bottom + 16;
+        nubTop = -7;
+        break;
+      case 'above':
+        tipLeft = hole.center.dx - tipW / 2;
+        tipTop = hole.top - tipH - 16;
+        nubTop = tipH - 7;
+        break;
+      default: // center
+        tipLeft = size.width / 2 - tipW / 2;
+        tipTop = size.height / 2 - tipH / 2;
+        nubShow = false;
+    }
+    // clamp horizontally
+    if (tipLeft < 12) tipLeft = 12;
+    if (tipLeft + tipW > size.width - 12) tipLeft = size.width - 12 - tipW;
+    if (tipTop < topPad + 44) tipTop = topPad + 44;
+    // nub x for below/above (point at target center relative to tip)
+    if (side == 'below' || side == 'above') {
+      nubLeft = (hole.center.dx - tipLeft - 7).clamp(16.0, tipW - 30.0);
+    }
 
     return Stack(children: [
-      // dimmed layer with a hole punched out at the target
+      // animated dimmed layer with a moving hole
       Positioned.fill(
-        child: CustomPaint(painter: _HolePainter(hole, s.round)),
+        child: TweenAnimationBuilder<Rect?>(
+          tween: RectTween(begin: hole, end: hole),
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOutCubic,
+          builder: (_, animRect, __) => CustomPaint(painter: _HolePainter(hasTarget ? animRect : null, s.round)),
+        ),
       ),
-      // amber ring around the target
-      if (hole != null)
-        Positioned(
+      // animated amber ring
+      if (hasTarget)
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOutCubic,
           left: hole.left, top: hole.top, width: hole.width, height: hole.height,
           child: IgnorePointer(
             child: Container(
               decoration: BoxDecoration(
                 border: Border.all(color: AppColors.amber, width: 2.5),
                 borderRadius: BorderRadius.circular(s.round ? hole.width : 14),
-                boxShadow: [BoxShadow(color: AppColors.amber.withOpacity(0.5), blurRadius: 16)],
+                boxShadow: [BoxShadow(color: AppColors.amber.withOpacity(0.5), blurRadius: 18)],
               ),
             ),
           ),
         ),
-      // Skip
+      // Skip pill (top-right, matches HTML)
       Positioned(
-        top: MediaQuery.of(context).padding.top + 8, right: 14,
+        top: topPad + 12, right: 16,
         child: GestureDetector(
           onTap: _finish,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
-            decoration: BoxDecoration(color: Colors.black.withOpacity(0.3), borderRadius: BorderRadius.circular(20)),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(color: Colors.black.withOpacity(0.25), borderRadius: BorderRadius.circular(20)),
             child: const Text('Skip ✕', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
           ),
         ),
       ),
-      // tooltip beside the target (or centered for intro/last)
-      _buildTooltip(context, s, hole, size, last),
-    ]);
-  }
-
-  Widget _buildTooltip(BuildContext context, _TourStep s, Rect? hole, Size size, bool last) {
-    const tipW = 230.0;
-    final card = Container(
-      width: tipW,
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 26)]),
-      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Text(s.emoji, style: const TextStyle(fontSize: 17)),
-          const SizedBox(width: 7),
-          Expanded(child: Text(s.title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800))),
-        ]),
-        const SizedBox(height: 6),
-        Text(s.text, style: const TextStyle(fontSize: 12, color: AppColors.ink2, height: 1.45)),
-        const SizedBox(height: 12),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('${_i + 1} / ${_steps.length}', style: const TextStyle(fontSize: 10.5, color: AppColors.muted, fontWeight: FontWeight.w700)),
-          Row(children: [
-            if (_i > 0)
-              GestureDetector(onTap: _prev, child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(9)), child: const Text('Back', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink2)))),
-            const SizedBox(width: 6),
-            GestureDetector(onTap: _next, child: Container(padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 7), decoration: BoxDecoration(color: AppColors.teal, borderRadius: BorderRadius.circular(9)), child: Text(last ? 'Done' : 'Next', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)))),
+      // animated tooltip with nub
+      AnimatedPositioned(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOutCubic,
+        left: tipLeft, top: tipTop,
+        child: SizedBox(
+          width: tipW,
+          child: Stack(clipBehavior: Clip.none, children: [
+            // nub (rotated square) — drawn first, behind the card edge
+            if (nubShow)
+              Positioned(
+                left: nubLeft, top: nubTop,
+                child: Transform.rotate(
+                  angle: 0.785398, // 45deg
+                  child: Container(width: 14, height: 14, color: Colors.white),
+                ),
+              ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x52000000), blurRadius: 30, offset: Offset(0, 10))]),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Text(s.emoji, style: const TextStyle(fontSize: 15)),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(s.title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink))),
+                ]),
+                const SizedBox(height: 4),
+                Text(s.text, style: const TextStyle(fontSize: 11.5, color: AppColors.ink2, height: 1.5)),
+                const SizedBox(height: 11),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Text('${_i + 1} / ${_steps.length}', style: const TextStyle(fontSize: 10, color: Color(0xFF9AAEAE), fontWeight: FontWeight.w700)),
+                  Row(children: [
+                    if (_i > 0)
+                      GestureDetector(onTap: _prev, child: Container(padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6), decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(9)), child: const Text('Back', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.ink2)))),
+                    const SizedBox(width: 6),
+                    GestureDetector(onTap: _next, child: Container(padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6), decoration: BoxDecoration(color: AppColors.teal, borderRadius: BorderRadius.circular(9)), child: Text(last ? 'Done' : 'Next', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Colors.white)))),
+                  ]),
+                ]),
+              ]),
+            ),
           ]),
-        ]),
-      ]),
-    );
-
-    // position: if no target → center; else place above/below depending on space
-    if (hole == null) {
-      return Center(child: card);
-    }
-    final spaceBelow = size.height - hole.bottom;
-    final placeBelow = spaceBelow > 200;
-    double top = placeBelow ? hole.bottom + 14 : hole.top - 150;
-    if (top < MediaQuery.of(context).padding.top + 50) top = MediaQuery.of(context).padding.top + 50;
-    // horizontal: keep on screen, prefer aligning near the target
-    double left = hole.center.dx - tipW / 2;
-    if (left < 12) left = 12;
-    if (left + tipW > size.width - 12) left = size.width - 12 - tipW;
-    // if target is on the right edge (map controls), put tooltip to its left
-    if (hole.right > size.width - 70) {
-      left = hole.left - tipW - 16;
-      if (left < 12) left = 12;
-      top = hole.center.dy - 70;
-      if (top < MediaQuery.of(context).padding.top + 50) top = MediaQuery.of(context).padding.top + 50;
-    }
-    return Positioned(left: left, top: top, child: card);
+        ),
+      ),
+    ]);
   }
 }
 
@@ -360,20 +411,16 @@ class _HolePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final dim = Paint()..color = const Color(0xBD091615);
+    final dim = Paint()..color = const Color(0xBD091615); // rgba(9,22,21,.74)
     if (hole == null) {
       canvas.drawRect(Offset.zero & size, dim);
       return;
     }
     final full = Path()..addRect(Offset.zero & size);
-    final Path cut;
-    if (round) {
-      cut = Path()..addOval(hole!);
-    } else {
-      cut = Path()..addRRect(RRect.fromRectAndRadius(hole!, const Radius.circular(14)));
-    }
-    final diff = Path.combine(PathOperation.difference, full, cut);
-    canvas.drawPath(diff, dim);
+    final cut = round
+        ? (Path()..addOval(hole!))
+        : (Path()..addRRect(RRect.fromRectAndRadius(hole!, const Radius.circular(12))));
+    canvas.drawPath(Path.combine(PathOperation.difference, full, cut), dim);
   }
 
   @override
