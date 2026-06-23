@@ -54,7 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final total = _devices.length;
     int run = 0, idle = 0, off = 0;
     for (final u in _devices) {
-      final s = stateOf(u['online'], u['speed']);
+      final s = stableStateFor('${u['id']}', u['online'], u['speed']);
       if (s == 'rn') run++;
       else if (s == 'id') idle++;
       else off++;
@@ -63,7 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     var list = _devices.where((u) {
       if (_filter.isEmpty) return true;
-      return stateOf(u['online'], u['speed']) == _filter;
+      return stableStateFor('${u['id']}', u['online'], u['speed']) == _filter;
     }).toList();
 
     return Scaffold(
@@ -219,7 +219,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _vehicleCard(Map<String, dynamic> u) {
-    final s = stateOf(u['online'], u['speed']);
+    final s = stableStateFor('${u['id']}', u['online'], u['speed']);
     final spd = s == 'of' ? '—' : '${u['speed'] ?? 0} km/h';
     final tint = s == 'rn'
         ? [const Color(0xFFF2FBF5), Colors.white]
