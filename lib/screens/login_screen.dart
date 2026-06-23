@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../services/biometric_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,12 +17,50 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
   bool _remember = true;
   String? _error;
+  bool _bioAvailable = false;
 
   @override
   void initState() {
     super.initState();
     final email = ApiService.userEmail;
     if (email != null && email.isNotEmpty) _email.text = email;
+    _maybeBiometricLogin();
+  }
+
+  // On login page open: if biometric login is enabled, auto-prompt face/finger.
+  Future<void> _maybeBiometricLogin() async {
+    final available = await BiometricService.isAvailable();
+    final enabled = await BiometricService.isEnabled();
+    if (!mounted) return;
+    setState(() => _bioAvailable = available && enabled);
+    if (available && enabled) {
+      // small delay so the page is built before the system prompt appears
+      await Future.delayed(const Duration(milliseconds: 350));
+      _biometricLogin();
+    }
+  }
+
+  Future<void> _biometricLogin() async {
+    final creds = await BiometricService.authenticate();
+    if (!mounted || creds == null) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final res = await ApiService.login(creds['email']!, creds['password']!);
+    if (!mounted) return;
+    if (res['ok'] == true) {
+      NotificationService.startEventPolling();
+      Navigator.pushReplacementNamed(context, '/dashboard');
+    } else {
+      // stored credentials no longer valid (e.g. password changed) — clear them
+      await BiometricService.disable();
+      setState(() {
+        _loading = false;
+        _bioAvailable = false;
+        _error = 'Saved login expired. Please sign in with your password.';
+      });
+    }
   }
 
   Future<void> _login() async {
@@ -37,12 +76,49 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     if (res['ok'] == true) {
       NotificationService.startEventPolling();
+      // offer to enable biometric login (only if the device supports it and
+      // it isn't already enabled)
+      final canBio = await BiometricService.isAvailable();
+      final already = await BiometricService.isEnabled();
+      if (mounted && canBio && !already) {
+        await _promptEnableBiometric(_email.text.trim(), _pass.text);
+      }
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/dashboard');
     } else {
       setState(() {
         _loading = false;
         _error = res['error']?.toString() ?? 'Login failed';
       });
+    }
+  }
+
+  Future<void> _promptEnableBiometric(String email, String password) async {
+    final enable = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(children: const [
+          Icon(Icons.fingerprint, color: AppColors.teal),
+          SizedBox(width: 10),
+          Expanded(child: Text('Enable Quick Login?', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
+        ]),
+        content: const Text(
+          'Use your Face or Fingerprint to log in next time — no need to type your password.',
+          style: TextStyle(fontSize: 13.5, height: 1.4),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Not Now')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white),
+            child: const Text('Enable'),
+          ),
+        ],
+      ),
+    );
+    if (enable == true) {
+      await BiometricService.enable(email, password);
     }
   }
 
@@ -141,6 +217,23 @@ class _LoginScreenState extends State<LoginScreen> {
                                           ),
                                         ),
                                         _loginButton(),
+                                        if (_bioAvailable)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 12),
+                                            child: SizedBox(
+                                              width: double.infinity,
+                                              child: OutlinedButton.icon(
+                                                onPressed: _loading ? null : _biometricLogin,
+                                                icon: const Icon(Icons.fingerprint, size: 22, color: AppColors.teal),
+                                                label: const Text('Login with Face / Fingerprint', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.teal)),
+                                                style: OutlinedButton.styleFrom(
+                                                  side: const BorderSide(color: AppColors.teal, width: 1.4),
+                                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
                                         Padding(
                                           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 2),
                                           child: Row(children: const [
