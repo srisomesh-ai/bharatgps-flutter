@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
+import 'tour_keys.dart';
 
 /// Shown once after install, before login. A 5-card welcome carousel.
 class WelcomeCarousel extends StatefulWidget {
@@ -162,59 +163,48 @@ class FeatureTour extends StatefulWidget {
   State<FeatureTour> createState() => _FeatureTourState();
 }
 
+class _TourStep {
+  final int tab;          // which nav tab this step lives on
+  final GlobalKey? key;   // target widget (null = centered intro card)
+  final String emoji;
+  final String title;
+  final String text;
+  final bool round;       // circular target (map control buttons)
+  const _TourStep({required this.tab, this.key, required this.emoji, required this.title, required this.text, this.round = false});
+}
+
 class _FeatureTourState extends State<FeatureTour> {
   int _i = 0;
+  Rect? _targetRect;
 
-  // Each step belongs to a page (tab). Steps with the SAME tab are shown while
-  // on that page (multiple key points). The last step on a page sets
-  // tapToAdvance=true → user must tap the highlighted nav tab to continue.
-  // 0=Dashboard 1=Activity 2=Map 3=Alerts 4=Profile
-  static const _stops = [
-    // DASHBOARD
-    {'tab': 0, 'icon': Icons.dashboard, 'title': 'Dashboard', 'text': 'This is your home base — a quick overview of your entire fleet.'},
-    {'tab': 0, 'icon': Icons.filter_alt, 'title': 'Quick Filters', 'text': 'The stat cards (Total, Running, Idle, Offline) are tappable — tap one to filter the vehicle list instantly.'},
-    {'tab': 0, 'icon': Icons.directions_car, 'title': 'Vehicle List', 'text': 'Tap any vehicle in the list to jump straight to it on the live map.', 'tapToAdvance': true, 'nextTab': 1},
-    // ACTIVITY
-    {'tab': 1, 'icon': Icons.bar_chart, 'title': 'Fleet Activity', 'text': 'See your fleet status breakdown — how many are Running, Idle or Offline at a glance.'},
-    {'tab': 1, 'icon': Icons.show_chart, 'title': 'Distance & Attention', 'text': 'Total fleet distance today, plus which vehicles need attention.', 'tapToAdvance': true, 'nextTab': 2},
-    // MAP
-    {'tab': 2, 'icon': Icons.map, 'title': 'Live Map', 'text': 'All your vehicles in real-time with smooth movement and direction. Tap a vehicle to see its details.'},
-    {'tab': 2, 'icon': Icons.layers, 'title': 'Map Types', 'text': 'Top-left: switch between Map, Satellite and Hybrid views.'},
-    {'tab': 2, 'icon': Icons.share, 'title': 'Share Live Tracking', 'text': 'Right-side Share button: send a live tracking link via WhatsApp — it expires automatically.'},
-    {'tab': 2, 'icon': Icons.fmd_good, 'title': 'Geofence & Controls', 'text': 'Right-side buttons: locate, show/hide names, compass, and the Geofence toggle to view your zones.', 'tapToAdvance': true, 'nextTab': 3},
-    // ALERTS
-    {'tab': 3, 'icon': Icons.notifications, 'title': 'Alerts', 'text': 'All your active alerts and their history. Get notified for speed, engine, power cut and more.'},
-    {'tab': 3, 'icon': Icons.add_alert, 'title': 'Create & Geofence', 'text': 'Bottom-right: the Create button makes new alerts, and the Geofence button sets up map zones.', 'tapToAdvance': true, 'nextTab': 4},
-    // PROFILE
-    {'tab': 4, 'icon': Icons.person, 'title': 'Profile', 'text': 'Your account, plan and days left.'},
-    {'tab': 4, 'icon': Icons.storefront, 'title': 'Store & Renew', 'text': 'Open Store & Services to buy GPS devices, request services, and renew your plan via UPI.'},
-    {'tab': 4, 'icon': Icons.help_center, 'title': 'Replay Anytime', 'text': 'Tap "How to Use" here anytime to replay this tour. You\'re all set — happy tracking! 🛰', 'last': true},
+  late final List<_TourStep> _steps = [
+    // DASHBOARD (tab 0)
+    _TourStep(tab: 0, key: null, emoji: '🏠', title: 'Dashboard', text: 'Your home base — a live overview of your entire fleet at a glance.'),
+    _TourStep(tab: 0, key: TourKeys.dashStats, emoji: '🎯', title: 'Quick Filters', text: 'Tap a card to filter Running, Idle or Offline vehicles instantly.'),
+    _TourStep(tab: 0, key: TourKeys.dashList, emoji: '🚚', title: 'Vehicle List', text: 'Tap any vehicle to jump straight to it on the live map.'),
+    // ACTIVITY (tab 1)
+    _TourStep(tab: 1, key: TourKeys.activityStatus, emoji: '📊', title: 'Fleet Activity', text: 'Your fleet status breakdown and total distance covered today.'),
+    // MAP (tab 2)
+    _TourStep(tab: 2, key: null, emoji: '🗺️', title: 'Live Map', text: 'All your vehicles update here in real-time with direction and speed. Tap a vehicle for full details.'),
+    _TourStep(tab: 2, key: TourKeys.mapTypes, emoji: '🗂️', title: 'Map Type', text: 'Switch between Map, Satellite and Hybrid views.'),
+    _TourStep(tab: 2, key: TourKeys.mapLocate, emoji: '📍', title: 'Locate', text: 'Center the map on your vehicles.', round: true),
+    _TourStep(tab: 2, key: TourKeys.mapShare, emoji: '📤', title: 'Share Tracking', text: 'Send a live tracking link on WhatsApp — it expires automatically.', round: true),
+    _TourStep(tab: 2, key: TourKeys.mapNames, emoji: '🏷️', title: 'Names', text: 'Show or hide vehicle name labels.', round: true),
+    _TourStep(tab: 2, key: TourKeys.mapGeofence, emoji: '▦', title: 'Geofence Zones', text: 'Toggle your saved geofence zones on the map.', round: true),
+    // ALERTS (tab 3)
+    _TourStep(tab: 3, key: null, emoji: '🔔', title: 'Alerts', text: 'All your alerts and their history. Get notified for speed, engine, power cut and more.'),
+    _TourStep(tab: 3, key: TourKeys.alertsGeofence, emoji: '▦', title: 'Geofence', text: 'Create map zones to alert on entry or exit.'),
+    _TourStep(tab: 3, key: TourKeys.alertsCreate, emoji: '➕', title: 'Create Alert', text: 'Make a new alert — speed, engine, power cut, geofence and more.'),
+    // PROFILE (tab 4)
+    _TourStep(tab: 4, key: null, emoji: '👤', title: 'Profile', text: 'Your account, plan and days remaining.'),
+    _TourStep(tab: 4, key: TourKeys.profileStore, emoji: '🛒', title: 'Store & Renew', text: 'Buy GPS devices, request services, and renew your plan via UPI.'),
+    _TourStep(tab: 4, key: null, emoji: '🎉', title: "You're all set!", text: 'Replay this tour anytime from Profile → How to Use. Happy tracking!'),
   ];
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      widget.onGoToTab(_stops[0]['tab'] as int);
-    });
-    FeatureTour.navTapped.addListener(_onNavTap);
-  }
-
-  void _onNavTap() {
-    final tapped = FeatureTour.navTapped.value;
-    if (tapped < 0) return;
-    final s = _stops[_i];
-    final tapToAdvance = (s['tapToAdvance'] as bool?) ?? false;
-    // if the user tapped the tab we asked them to, advance the tour
-    if (tapToAdvance && tapped == (s['nextTab'] as int)) {
-      _advance();
-    }
-  }
-
-  @override
-  void dispose() {
-    FeatureTour.navTapped.removeListener(_onNavTap);
-    super.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _goToStep(0));
   }
 
   Future<void> _finish() async {
@@ -222,133 +212,170 @@ class _FeatureTourState extends State<FeatureTour> {
     widget.onDone();
   }
 
-  void _advance() {
+  // switch to the step's tab, wait for the screen to build, then measure target
+  Future<void> _goToStep(int i) async {
+    final step = _steps[i];
+    widget.onGoToTab(step.tab);
+    // give the destination screen a moment to build & lay out
+    await Future.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
+    _measure();
+  }
+
+  void _measure() {
+    final step = _steps[_i];
+    Rect? rect;
+    final key = step.key;
+    if (key != null) {
+      final ctx = key.currentContext;
+      if (ctx != null) {
+        final box = ctx.findRenderObject() as RenderBox?;
+        if (box != null && box.hasSize) {
+          final pos = box.localToGlobal(Offset.zero);
+          rect = pos & box.size;
+        }
+      }
+    }
+    setState(() => _targetRect = rect);
+  }
+
+  void _next() {
     Haptics.light();
-    if (_i < _stops.length - 1) {
-      final nextTab = _stops[_i + 1]['tab'] as int;
-      setState(() => _i++);
-      widget.onGoToTab(nextTab);
+    if (_i < _steps.length - 1) {
+      setState(() { _i++; _targetRect = null; });
+      _goToStep(_i);
     } else {
       _finish();
     }
   }
 
+  void _prev() {
+    if (_i > 0) {
+      Haptics.light();
+      setState(() { _i--; _targetRect = null; });
+      _goToStep(_i);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final s = _stops[_i];
-    final last = (s['last'] as bool?) ?? false;
-    final tapToAdvance = (s['tapToAdvance'] as bool?) ?? false;
-    final tab = s['tab'] as int;
-    final screenW = MediaQuery.of(context).size.width;
-    final itemCenterX = screenW * (tab + 0.5) / 5;
-    // step number within the current page (for "1 of N" feel) — simple global dots
+    final s = _steps[_i];
+    final last = _i == _steps.length - 1;
+    final size = MediaQuery.of(context).size;
+    final r = _targetRect;
+    const pad = 7.0;
+    final hole = (r == null) ? null : Rect.fromLTRB(r.left - pad, r.top - pad, r.right + pad, r.bottom + pad);
 
     return Stack(children: [
-      // dim only the area ABOVE the bottom nav, so the real nav stays tappable
-      Positioned(
-        top: 0, left: 0, right: 0, bottom: 64,
-        child: Material(
-          color: Colors.black.withOpacity(0.74),
-          child: SafeArea(
-            child: Align(
-              alignment: Alignment.topRight,
-              child: TextButton(onPressed: _finish, child: const Text('Skip', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))),
-            ),
-          ),
-        ),
+      // dimmed layer with a hole punched out at the target
+      Positioned.fill(
+        child: CustomPaint(painter: _HolePainter(hole, s.round)),
       ),
-
-      // explanation card — sits just above the nav bar
-      Positioned(
-        left: 20, right: 20, bottom: 76,
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 30)]),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Container(
-                width: 46, height: 46,
-                decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.12), borderRadius: BorderRadius.circular(13)),
-                child: Icon(s['icon'] as IconData, color: AppColors.teal, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Text(s['title'] as String, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
-            ]),
-            const SizedBox(height: 11),
-            Text(s['text'] as String, style: const TextStyle(fontSize: 13.5, color: AppColors.ink2, height: 1.5)),
-            const SizedBox(height: 15),
-            if (tapToAdvance) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                decoration: BoxDecoration(color: AppColors.amber.withOpacity(0.15), borderRadius: BorderRadius.circular(11), border: Border.all(color: AppColors.amber, width: 1.2)),
-                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  const Icon(Icons.touch_app, size: 17, color: AppColors.amber),
-                  const SizedBox(width: 7),
-                  Text('Tap the ${_tabName(s['nextTab'] as int)} tab below', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFFB8801A))),
-                ]),
-              ),
-              const SizedBox(height: 8),
-              Center(child: TextButton(onPressed: _advance, child: const Text('or tap here to continue', style: TextStyle(fontSize: 11.5, color: AppColors.ink2)))),
-            ] else
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Row(children: List.generate(_stops.length, (i) {
-                  final on = i == _i;
-                  return Container(margin: const EdgeInsets.only(right: 3), width: on ? 14 : 5, height: 5, decoration: BoxDecoration(color: on ? AppColors.teal : AppColors.line, borderRadius: BorderRadius.circular(3)));
-                })),
-                ElevatedButton(
-                  onPressed: _advance,
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11))),
-                  child: Text(last ? 'Done' : 'Next', style: const TextStyle(fontWeight: FontWeight.w700)),
-                ),
-              ]),
-          ]),
-        ),
-      ),
-
-      // bouncing arrow + highlight ring ON the nav item the user should tap
-      if (tapToAdvance) ...[
-        Positioned(bottom: 60, left: itemCenterX - 17, child: const _BounceArrow()),
+      // amber ring around the target
+      if (hole != null)
         Positioned(
-          bottom: 4, left: itemCenterX - 30,
+          left: hole.left, top: hole.top, width: hole.width, height: hole.height,
           child: IgnorePointer(
             child: Container(
-              width: 60, height: 56,
-              decoration: BoxDecoration(border: Border.all(color: AppColors.amber, width: 2.5), borderRadius: BorderRadius.circular(13)),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.amber, width: 2.5),
+                borderRadius: BorderRadius.circular(s.round ? hole.width : 14),
+                boxShadow: [BoxShadow(color: AppColors.amber.withOpacity(0.5), blurRadius: 16)],
+              ),
             ),
           ),
         ),
-      ],
+      // Skip
+      Positioned(
+        top: MediaQuery.of(context).padding.top + 8, right: 14,
+        child: GestureDetector(
+          onTap: _finish,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+            decoration: BoxDecoration(color: Colors.black.withOpacity(0.3), borderRadius: BorderRadius.circular(20)),
+            child: const Text('Skip ✕', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
+          ),
+        ),
+      ),
+      // tooltip beside the target (or centered for intro/last)
+      _buildTooltip(context, s, hole, size, last),
     ]);
   }
 
-  String _tabName(int i) => const ['Dashboard', 'Activity', 'Map', 'Alerts', 'Profile'][i];
-}
-
-/// A small bouncing down-arrow used to point at the nav item.
-class _BounceArrow extends StatefulWidget {
-  const _BounceArrow();
-  @override
-  State<_BounceArrow> createState() => _BounceArrowState();
-}
-
-class _BounceArrowState extends State<_BounceArrow> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (_, __) => Transform.translate(
-        offset: Offset(0, _c.value * 8),
-        child: const Icon(Icons.keyboard_double_arrow_down, color: AppColors.amber, size: 34),
-      ),
+  Widget _buildTooltip(BuildContext context, _TourStep s, Rect? hole, Size size, bool last) {
+    const tipW = 230.0;
+    final card = Container(
+      width: tipW,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 26)]),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Text(s.emoji, style: const TextStyle(fontSize: 17)),
+          const SizedBox(width: 7),
+          Expanded(child: Text(s.title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800))),
+        ]),
+        const SizedBox(height: 6),
+        Text(s.text, style: const TextStyle(fontSize: 12, color: AppColors.ink2, height: 1.45)),
+        const SizedBox(height: 12),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text('${_i + 1} / ${_steps.length}', style: const TextStyle(fontSize: 10.5, color: AppColors.muted, fontWeight: FontWeight.w700)),
+          Row(children: [
+            if (_i > 0)
+              GestureDetector(onTap: _prev, child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(9)), child: const Text('Back', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink2)))),
+            const SizedBox(width: 6),
+            GestureDetector(onTap: _next, child: Container(padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 7), decoration: BoxDecoration(color: AppColors.teal, borderRadius: BorderRadius.circular(9)), child: Text(last ? 'Done' : 'Next', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)))),
+          ]),
+        ]),
+      ]),
     );
+
+    // position: if no target → center; else place above/below depending on space
+    if (hole == null) {
+      return Center(child: card);
+    }
+    final spaceBelow = size.height - hole.bottom;
+    final placeBelow = spaceBelow > 200;
+    double top = placeBelow ? hole.bottom + 14 : hole.top - 150;
+    if (top < MediaQuery.of(context).padding.top + 50) top = MediaQuery.of(context).padding.top + 50;
+    // horizontal: keep on screen, prefer aligning near the target
+    double left = hole.center.dx - tipW / 2;
+    if (left < 12) left = 12;
+    if (left + tipW > size.width - 12) left = size.width - 12 - tipW;
+    // if target is on the right edge (map controls), put tooltip to its left
+    if (hole.right > size.width - 70) {
+      left = hole.left - tipW - 16;
+      if (left < 12) left = 12;
+      top = hole.center.dy - 70;
+      if (top < MediaQuery.of(context).padding.top + 50) top = MediaQuery.of(context).padding.top + 50;
+    }
+    return Positioned(left: left, top: top, child: card);
   }
+}
+
+/// Paints a full-screen dim with a rounded/circular transparent hole.
+class _HolePainter extends CustomPainter {
+  final Rect? hole;
+  final bool round;
+  _HolePainter(this.hole, this.round);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final dim = Paint()..color = const Color(0xBD091615);
+    if (hole == null) {
+      canvas.drawRect(Offset.zero & size, dim);
+      return;
+    }
+    final full = Path()..addRect(Offset.zero & size);
+    final Path cut;
+    if (round) {
+      cut = Path()..addOval(hole!);
+    } else {
+      cut = Path()..addRRect(RRect.fromRectAndRadius(hole!, const Radius.circular(14)));
+    }
+    final diff = Path.combine(PathOperation.difference, full, cut);
+    canvas.drawPath(diff, dim);
+  }
+
+  @override
+  bool shouldRepaint(_HolePainter old) => old.hole != hole || old.round != round;
 }
