@@ -254,14 +254,143 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
     await _sendWhatsApp(msg);
   }
 
+  static const _upiId = 'sribharatgpstrackerprivatelimited.ibz@icici';
+  static const _payeeName = 'Bharat GPS Tracker';
+  static const _renewWhatsApp = '9381874178';
+
   void _renewNow(Map plan) {
     Haptics.medium();
-    // Razorpay coming later — for now route to sales to arrange renewal
-    _contactSheet(
-      title: 'Renew — ${plan['name']}',
-      email: _salesEmail,
-      message: "I'd like to renew my GPS plan: ${plan['name']} (₹${_fmt(plan['price'] as int)} + GST).\n\nName: $_userName\nAccount: $_userEmail\n\nPlease help me renew.",
+    final base = plan['price'] as int;
+    final gst = (base * 0.18).round();
+    final total = base + gst;
+    final planName = plan['name'] as String;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+        padding: EdgeInsets.fromLTRB(18, 12, 18, 18 + MediaQuery.of(context).padding.bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Center(child: Container(width: 38, height: 5, margin: const EdgeInsets.only(bottom: 14), decoration: BoxDecoration(color: const Color(0xFFE2E9E8), borderRadius: BorderRadius.circular(3)))),
+          Text('Renew — $planName', style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 14),
+          // price breakdown
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(12)),
+            child: Column(children: [
+              _priceRow('Plan ($planName)', '₹${_fmt(base)}'),
+              const SizedBox(height: 7),
+              _priceRow('GST (18%)', '₹${_fmt(gst)}'),
+              const Padding(padding: EdgeInsets.symmetric(vertical: 9), child: Divider(height: 1)),
+              _priceRow('Total Payable', '₹${_fmt(total)}', bold: true),
+            ]),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () { Navigator.pop(context); _payUpi(planName, total); },
+              icon: const Icon(Icons.account_balance_wallet, size: 20),
+              label: Text('Pay ₹${_fmt(total)} via UPI'),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text('Opens PhonePe / Google Pay / Paytm with the amount pre-filled.', style: TextStyle(fontSize: 11.5, color: AppColors.ink2), textAlign: TextAlign.center),
+        ]),
+      ),
     );
+  }
+
+  Widget _priceRow(String label, String value, {bool bold = false}) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: bold ? 15 : 13.5, fontWeight: bold ? FontWeight.w800 : FontWeight.w500, color: bold ? AppColors.ink : AppColors.ink2)),
+          Text(value, style: TextStyle(fontSize: bold ? 17 : 13.5, fontWeight: bold ? FontWeight.w800 : FontWeight.w600, color: bold ? AppColors.teal : AppColors.ink)),
+        ],
+      );
+
+  Future<void> _payUpi(String planName, int amount) async {
+    Haptics.medium();
+    final note = 'GPS Renewal - $planName';
+    final upi = Uri.parse(
+      'upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=$amount&cu=INR&tn=${Uri.encodeComponent(note)}',
+    );
+    bool opened = false;
+    try {
+      if (await canLaunchUrl(upi)) {
+        opened = await launchUrl(upi, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+    if (!opened) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No UPI app found. Please install PhonePe, GPay or Paytm.')));
+      return;
+    }
+    // after returning from the UPI app, prompt to share the screenshot
+    await Future.delayed(const Duration(seconds: 1));
+    if (mounted) _screenshotPrompt(planName, amount);
+  }
+
+  void _screenshotPrompt(String planName, int amount) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+        padding: EdgeInsets.fromLTRB(18, 12, 18, 18 + MediaQuery.of(context).padding.bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Center(child: Container(width: 38, height: 5, margin: const EdgeInsets.only(bottom: 14), decoration: BoxDecoration(color: const Color(0xFFE2E9E8), borderRadius: BorderRadius.circular(3)))),
+          Row(children: [
+            Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.12), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.receipt_long, color: AppColors.teal)),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('Share Payment Screenshot', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800))),
+          ]),
+          const SizedBox(height: 12),
+          const Text(
+            '1. Take a screenshot of your payment confirmation.\n2. Tap below to open WhatsApp and send it to us.\n3. We\'ll renew your GPS once verified.',
+            style: TextStyle(fontSize: 13, color: AppColors.ink2, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () { Navigator.pop(context); _sendScreenshotWhatsApp(planName, amount); },
+              icon: const Icon(Icons.chat, size: 20),
+              label: const Text('Send Screenshot on WhatsApp'),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal2, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Future<void> _sendScreenshotWhatsApp(String planName, int amount) async {
+    final msg = 'GPS Renewal Payment ✅\n\n'
+        'Plan: $planName\n'
+        'Amount Paid: ₹${_fmt(amount)} (incl. GST)\n'
+        'Name: $_userName\n'
+        'Account: $_userEmail\n\n'
+        'Payment screenshot attached. Please renew my GPS.';
+    final encoded = Uri.encodeComponent(msg);
+    final targets = [
+      'whatsapp://send?phone=91$_renewWhatsApp&text=$encoded',
+      'https://wa.me/91$_renewWhatsApp?text=$encoded',
+    ];
+    for (final t in targets) {
+      try {
+        final uri = Uri.parse(t);
+        if (await canLaunchUrl(uri)) {
+          if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+        }
+      } catch (_) {}
+    }
+    await Clipboard.setData(ClipboardData(text: msg));
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('WhatsApp not found — details copied')));
   }
 
   // ---- shared widgets ----
