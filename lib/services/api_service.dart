@@ -838,6 +838,10 @@ class ApiService {
       String two(int n) => n.toString().padLeft(2, '0');
       final exp = '${expiresAt.year}-${two(expiresAt.month)}-${two(expiresAt.day)} '
           '${two(expiresAt.hour)}:${two(expiresAt.minute)}:${two(expiresAt.second)}';
+      // 1) does LISTING shares work? (tells us if it's a blanket permission block)
+      final getRes = await http.get(_u(host!, 'sharing', {'lang': 'en', 'user_api_hash': hash!}))
+          .timeout(const Duration(seconds: 20));
+      // 2) try creating with the device id
       final res = await http.post(
         _u(host!, 'sharing', {'lang': 'en', 'user_api_hash': hash!}),
         headers: {'Content-Type': 'application/json'},
@@ -849,7 +853,10 @@ class ApiService {
           'expiration_date': exp,
         }),
       ).timeout(const Duration(seconds: 25));
-      return 'HTTP ${res.statusCode}\nhost: $host\n\n${res.body}';
+      return 'host: $host\ndevices sent: $devices\n\n'
+          '=== GET /sharing (list) HTTP ${getRes.statusCode} ===\n'
+          '${getRes.body.length > 500 ? getRes.body.substring(0, 500) : getRes.body}\n\n'
+          '=== POST /sharing (create) HTTP ${res.statusCode} ===\n${res.body}';
     } catch (e) {
       return 'ERROR: $e';
     }
