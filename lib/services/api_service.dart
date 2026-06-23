@@ -122,6 +122,9 @@ class ApiService {
       'lat': d['lat'] ?? d['latitude'],
       'lng': d['lng'] ?? d['longitude'],
       'time': d['time'],
+      // expiry STATUS — the API exposes "Expired" in the time field for expired
+      // devices even though it hides the actual date for non-admin users
+      'expired': (d['time']?.toString().toLowerCase().trim() == 'expired'),
       'course': double.tryParse('${d['course'] ?? 0}') ?? 0,
       'address': (d['address'] != null && d['address'].toString() != '-' && d['address'].toString().isNotEmpty) ? d['address'] : '',
       'model': dd['device_model'] ?? dd['model'] ?? d['model'] ?? '',
