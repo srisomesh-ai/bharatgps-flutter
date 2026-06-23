@@ -57,11 +57,32 @@ ThemeData buildTheme() {
 // status helpers
 String stateOf(String? online, num? speed) {
   if (online == 'offline' || online == null) return 'of';
-  // online — but "Running" should mean actually moving, not just connected.
-  // A parked vehicle that's still reporting is Idle, not Running.
-  final spd = speed ?? 0;
-  if (spd > 3) return 'rn'; // genuinely moving
-  return 'id';              // online but stopped/parked = Idle
+  if (online == 'online') return 'rn';
+  if (online == 'ack') return 'id';
+  return (speed ?? 0) > 3 ? 'rn' : 'id';
+}
+
+// ===== Debounced status (matches the web panel's stableState) =====
+// A vehicle that briefly shows speed 0 (GPS glitch, traffic, signal) stays
+// "Running" until it has actually been still for STOP_GRACE. This prevents the
+// status flickering to Idle during normal driving.
+const int kStopGraceMs = 45000; // 45s, same as the web panel STOP_GRACE
+final Map<String, int> _lastRunAt = {}; // deviceId -> last time it was running (ms)
+
+/// Returns the stable state for a device using the raw fields + a per-device
+/// last-running memory. `id` identifies the vehicle so each is tracked.
+String stableStateFor(String id, String? online, num? speed) {
+  final raw = stateOf(online, speed);
+  if (raw == 'of') return 'of';
+  final now = DateTime.now().millisecondsSinceEpoch;
+  if (raw == 'rn') {
+    _lastRunAt[id] = now;
+    return 'rn';
+  }
+  // raw says idle — but if it was running within the grace window, hold running
+  final last = _lastRunAt[id];
+  if (last != null && (now - last) < kStopGraceMs) return 'rn';
+  return 'id';
 }
 
 const stateLabels = {'rn': 'Running', 'id': 'Idle', 'of': 'Offline'};
