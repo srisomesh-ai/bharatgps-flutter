@@ -7,6 +7,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
+import 'tour_keys.dart';
 import 'main_shell.dart';
 import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
@@ -532,6 +533,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   ),
                   const Spacer(),
                   Container(
+                    key: TourKeys.mapTypes,
                     padding: const EdgeInsets.all(3),
                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 8)]),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -547,14 +549,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               Positioned(
                 right: 14, top: 70,
                 child: Column(children: [
-                  _mapCtrl(Icons.my_location, () {
+                  KeyedSubtree(key: TourKeys.mapLocate, child: _mapCtrl(Icons.my_location, () {
                     if (_devices.isNotEmpty && _devices.first['lat'] != null) {
                       _map.move(LatLng(_toD(_devices.first['lat']), _toD(_devices.first['lng'])), 14);
                     }
-                  }),
+                  })),
                   const SizedBox(height: 12),
                   // SHARE this vehicle's live tracking (replaces duplicate layers toggle)
-                  _mapCtrl(Icons.share, () {
+                  KeyedSubtree(key: TourKeys.mapShare, child: _mapCtrl(Icons.share, () {
                     Haptics.medium();
                     final u = _selected ?? (_visibleDevices(needLatLng: true).isNotEmpty ? _visibleDevices(needLatLng: true).first : null);
                     if (u == null) {
@@ -567,13 +569,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       backgroundColor: Colors.transparent,
                       builder: (_) => _ShareSheet(device: u),
                     );
-                  }),
+                  })),
                   const SizedBox(height: 12),
                   // show/hide vehicle names
-                  _mapCtrl(_showNames ? Icons.label : Icons.label_off, () => setState(() => _showNames = !_showNames)),
+                  KeyedSubtree(key: TourKeys.mapNames, child: _mapCtrl(_showNames ? Icons.label : Icons.label_off, () => setState(() => _showNames = !_showNames))),
                   const SizedBox(height: 12),
                   // GEOFENCE visibility toggle (active = teal filled)
                   GestureDetector(
+                    key: TourKeys.mapGeofence,
                     onTap: _toggleGeofences,
                     child: Container(
                       width: 46, height: 46,
