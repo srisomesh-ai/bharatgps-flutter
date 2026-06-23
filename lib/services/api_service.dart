@@ -52,6 +52,49 @@ class ApiService {
     return Uri.https(server, '/api/$path', q);
   }
 
+  /// Robust timestamp parser. The history API returns times like
+  /// "23-06-2026 10:05:00 AM" (DD-MM-YYYY 12-hour) which DateTime.tryParse
+  /// cannot handle. This parses both that and ISO formats.
+  static DateTime? parseTs(dynamic raw) {
+    if (raw == null) return null;
+    var s = raw.toString().trim();
+    if (s.isEmpty) return null;
+    // already ISO? (YYYY-MM-DD...)
+    final iso = DateTime.tryParse(s.replaceFirst(' ', 'T'));
+    if (iso != null) return iso;
+    try {
+      // detect AM/PM
+      bool pm = false, am = false;
+      final up = s.toUpperCase();
+      if (up.endsWith('AM')) { am = true; s = s.substring(0, s.length - 2).trim(); }
+      else if (up.endsWith('PM')) { pm = true; s = s.substring(0, s.length - 2).trim(); }
+      final parts = s.split(' ');
+      if (parts.isEmpty) return null;
+      final datePart = parts[0];
+      final timePart = parts.length > 1 ? parts[1] : '00:00:00';
+      // date can be DD-MM-YYYY or DD/MM/YYYY
+      final d = datePart.split(RegExp(r'[-/]'));
+      if (d.length != 3) return null;
+      int day, month, year;
+      if (d[0].length == 4) {
+        // YYYY-MM-DD
+        year = int.parse(d[0]); month = int.parse(d[1]); day = int.parse(d[2]);
+      } else {
+        // DD-MM-YYYY
+        day = int.parse(d[0]); month = int.parse(d[1]); year = int.parse(d[2]);
+      }
+      final tp = timePart.split(':');
+      int hh = tp.isNotEmpty ? int.parse(tp[0]) : 0;
+      int mm = tp.length > 1 ? int.parse(tp[1]) : 0;
+      int ss = tp.length > 2 ? int.parse(tp[2]) : 0;
+      if (pm && hh < 12) hh += 12;
+      if (am && hh == 12) hh = 0;
+      return DateTime(year, month, day, hh, mm, ss);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// LOGIN — tries each server until one authenticates.
   static Future<Map<String, dynamic>> login(String email, String password) async {
     for (final server in servers) {
@@ -267,8 +310,8 @@ class ApiService {
       }
       // cluster is points[i .. j-1]
       if (j - 1 > i) {
-        final t0 = DateTime.tryParse(points[i]['t'].toString().replaceFirst(' ', 'T'));
-        final t1 = DateTime.tryParse(points[j - 1]['t'].toString().replaceFirst(' ', 'T'));
+        final t0 = parseTs(points[i]['t']);
+        final t1 = parseTs(points[j - 1]['t']);
         if (t0 != null && t1 != null) {
           final secs = t1.difference(t0).inSeconds;
           if (secs >= 90) {
@@ -285,8 +328,8 @@ class ApiService {
       } else {
         // not a cluster — but check for a big time gap (device was off/parked)
         if (i + 1 < points.length) {
-          final t0 = DateTime.tryParse(points[i]['t'].toString().replaceFirst(' ', 'T'));
-          final t1 = DateTime.tryParse(points[i + 1]['t'].toString().replaceFirst(' ', 'T'));
+          final t0 = parseTs(points[i]['t']);
+          final t1 = parseTs(points[i + 1]['t']);
           if (t0 != null && t1 != null) {
             final gap = t1.difference(t0).inSeconds;
             if (gap >= 300) {
@@ -312,8 +355,8 @@ class ApiService {
       if (sp > maxSpeed) maxSpeed = sp;
     }
     // moving duration = total span minus time spent in stops
-    DateTime? firstT = points.isNotEmpty ? DateTime.tryParse(points.first['t'].toString().replaceFirst(' ', 'T')) : null;
-    DateTime? lastT = points.isNotEmpty ? DateTime.tryParse(points.last['t'].toString().replaceFirst(' ', 'T')) : null;
+    DateTime? firstT = points.isNotEmpty ? parseTs(points.first['t']) : null;
+    DateTime? lastT = points.isNotEmpty ? parseTs(points.last['t']) : null;
     int totalSecs = (firstT != null && lastT != null) ? lastT.difference(firstT).inSeconds : 0;
     int stoppedSecs = 0;
     for (final s in stops) {
@@ -368,7 +411,7 @@ class ApiService {
 
     List<Map<String, dynamic>> cur = [];
     DateTime? lastMove;
-    DateTime? pt(dynamic t) => DateTime.tryParse('$t'.replaceFirst(' ', 'T'));
+    DateTime? pt(dynamic t) => parseTs(t);
 
     void closeTrip() {
       if (cur.length < 2) {
@@ -431,8 +474,8 @@ class ApiService {
     for (int i = 0; i < pts.length; i++) {
       if ((pts[i]['spd'] as int) > maxSpd) maxSpd = pts[i]['spd'];
       if (i > 0 && (pts[i]['spd'] as int) > 2) {
-        final t0 = DateTime.tryParse(pts[i - 1]['t'].toString().replaceFirst(' ', 'T'));
-        final t1 = DateTime.tryParse(pts[i]['t'].toString().replaceFirst(' ', 'T'));
+        final t0 = parseTs(pts[i - 1]['t']);
+        final t1 = parseTs(pts[i]['t']);
         if (t0 != null && t1 != null) {
           final s = t1.difference(t0).inSeconds;
           if (s > 0 && s < 3600) moveSec += s;
