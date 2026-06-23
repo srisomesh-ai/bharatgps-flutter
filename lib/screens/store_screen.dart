@@ -107,14 +107,10 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
     final targets = [
       'whatsapp://send?phone=91$_phone&text=$encoded',
       'https://wa.me/91$_phone?text=$encoded',
+      'https://api.whatsapp.com/send?phone=91$_phone&text=$encoded',
     ];
     for (final t in targets) {
-      try {
-        final uri = Uri.parse(t);
-        if (await canLaunchUrl(uri)) {
-          if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
-        }
-      } catch (_) {}
+      if (await _tryLaunch(t)) return;
     }
     await Clipboard.setData(ClipboardData(text: message));
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('WhatsApp not found — message copied')));
@@ -131,6 +127,17 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
       }
     } catch (_) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open $what')));
+    }
+  }
+
+  // Launch a URL directly WITHOUT canLaunchUrl gating. canLaunchUrl can falsely
+  // return false for upi:// and whatsapp:// even when an app exists, so we just
+  // try launchUrl and report success/failure from it.
+  Future<bool> _tryLaunch(String url) async {
+    try {
+      return await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      return false;
     }
   }
 
@@ -317,15 +324,8 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
   Future<void> _payUpi(String planName, int amount) async {
     Haptics.medium();
     final note = 'GPS Renewal - $planName';
-    final upi = Uri.parse(
-      'upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=$amount&cu=INR&tn=${Uri.encodeComponent(note)}',
-    );
-    bool opened = false;
-    try {
-      if (await canLaunchUrl(upi)) {
-        opened = await launchUrl(upi, mode: LaunchMode.externalApplication);
-      }
-    } catch (_) {}
+    final upiUrl = 'upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=$amount&cu=INR&tn=${Uri.encodeComponent(note)}';
+    final opened = await _tryLaunch(upiUrl);
     if (!opened) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No UPI app found. Please install PhonePe, GPay or Paytm.')));
       return;
@@ -381,14 +381,10 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
     final targets = [
       'whatsapp://send?phone=91$_renewWhatsApp&text=$encoded',
       'https://wa.me/91$_renewWhatsApp?text=$encoded',
+      'https://api.whatsapp.com/send?phone=91$_renewWhatsApp&text=$encoded',
     ];
     for (final t in targets) {
-      try {
-        final uri = Uri.parse(t);
-        if (await canLaunchUrl(uri)) {
-          if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
-        }
-      } catch (_) {}
+      if (await _tryLaunch(t)) return;
     }
     await Clipboard.setData(ClipboardData(text: msg));
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('WhatsApp not found — details copied')));
@@ -515,11 +511,8 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
   Future<void> _payUpiBuy(String deviceName, int amount, String remarks, String? coupon) async {
     Haptics.medium();
     final note = remarks.isNotEmpty ? 'GPS - $deviceName - $remarks' : 'GPS Purchase - $deviceName';
-    final upi = Uri.parse('upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=$amount&cu=INR&tn=${Uri.encodeComponent(note)}');
-    bool opened = false;
-    try {
-      if (await canLaunchUrl(upi)) opened = await launchUrl(upi, mode: LaunchMode.externalApplication);
-    } catch (_) {}
+    final upiUrl = 'upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=$amount&cu=INR&tn=${Uri.encodeComponent(note)}';
+    final opened = await _tryLaunch(upiUrl);
     if (!opened) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No UPI app found. Please install PhonePe, GPay or Paytm.')));
       return;
@@ -574,14 +567,10 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
     final targets = [
       'whatsapp://send?phone=91$_phone&text=$encoded',
       'https://wa.me/91$_phone?text=$encoded',
+      'https://api.whatsapp.com/send?phone=91$_phone&text=$encoded',
     ];
     for (final t in targets) {
-      try {
-        final uri = Uri.parse(t);
-        if (await canLaunchUrl(uri)) {
-          if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
-        }
-      } catch (_) {}
+      if (await _tryLaunch(t)) return;
     }
     await Clipboard.setData(ClipboardData(text: msg));
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('WhatsApp not found — details copied')));
