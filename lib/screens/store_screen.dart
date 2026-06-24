@@ -20,11 +20,11 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
 
   // device catalogue
   static const _devices = [
-    {'name': 'Basic GPS', 'price': 3500, 'desc': 'Real-time tracking for cars, bikes & fleet', 'icon': Icons.gps_fixed},
-    {'name': 'Engine Cut Off GPS', 'price': 4500, 'desc': 'Remotely immobilise the engine + live tracking', 'icon': Icons.power_settings_new},
-    {'name': 'Magnet GPS', 'price': 5500, 'desc': 'Wireless magnetic tracker, no wiring needed', 'icon': Icons.attractions},
-    {'name': 'Micro GPS', 'price': 4000, 'desc': 'Compact hidden tracker for discreet use', 'icon': Icons.memory},
-    {'name': 'VLTD (RTO) GPS', 'price': 11000, 'desc': 'AIS-140 approved, RTO-compliant device', 'icon': Icons.verified},
+    {'name': 'Basic GPS', 'price': 3499, 'desc': 'Real-time tracking for cars, bikes & fleet', 'icon': Icons.gps_fixed},
+    {'name': 'Engine Cut Off GPS', 'price': 4499, 'desc': 'Remotely immobilise the engine + live tracking', 'icon': Icons.power_settings_new},
+    {'name': 'Magnet GPS', 'price': 5999, 'desc': 'Wireless magnetic tracker, no wiring needed', 'icon': Icons.attractions},
+    {'name': 'Micro GPS', 'price': 3499, 'desc': 'Compact hidden tracker for discreet use', 'icon': Icons.memory},
+    {'name': 'VLTD (RTO) GPS', 'price': 9499, 'desc': 'AIS-140 approved, RTO-compliant device', 'icon': Icons.verified},
   ];
 
   // services
@@ -32,15 +32,16 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
     {'name': 'Change to Other Vehicle', 'price': 500, 'desc': 'Shift your GPS to a different vehicle', 'icon': Icons.swap_horiz},
     {'name': 'Remove (Vehicle Sold)', 'price': 500, 'desc': 'Deactivate & remove GPS from a sold vehicle', 'icon': Icons.remove_circle_outline},
     {'name': 'Re-Activation', 'price': 1500, 'desc': 'Reactivate a previously disabled device', 'icon': Icons.refresh},
+    {'name': 'Troubleshoot', 'price': 350, 'desc': 'On-site diagnosis & fix for device issues', 'icon': Icons.build},
   ];
 
   // renewal plans
   static const _plans = [
-    {'name': '3 Months', 'price': 300, 'free': ''},
-    {'name': '6 Months', 'price': 600, 'free': ''},
+    {'name': '3 Months', 'price': 350, 'free': ''},
+    {'name': '6 Months', 'price': 700, 'free': ''},
     {'name': '1 Year', 'price': 1200, 'free': ''},
-    {'name': '2 Years', 'price': 2000, 'free': ''},
-    {'name': '5 Years', 'price': 4000, 'free': '1 Year Free'},
+    {'name': '2 Years', 'price': 2400, 'free': ''},
+    {'name': '4 Years', 'price': 4800, 'free': '1 Year Extra'},
   ];
 
   @override
@@ -205,7 +206,9 @@ class _StoreScreenState extends State<StoreScreen> with SingleTickerProviderStat
               desc: s['desc'] as String,
               price: s['price'] as int,
               priceNote: '+ GST',
-              actionLabel: 'Request Service',
+              actionLabel: 'Request',
+              onPay: () => _buyPay(s['name'] as String, s['price'] as int),
+              onIconTap: () => _buyPayNoGst(s['name'] as String, s['price'] as int),
               onAction: () => _contactSheet(
                 title: 'Service — ${s['name']}',
                 email: _supportEmail,
