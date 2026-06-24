@@ -213,17 +213,45 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       }
       var perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+      if (perm == LocationPermission.denied) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Location permission denied')));
         return;
       }
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      if (perm == LocationPermission.deniedForever) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Location permission permanently denied — enable it in phone Settings')));
+        return;
+      }
+
+      Position? pos;
+      // 1) try a quick last-known position first (instant, no GPS wait)
+      try {
+        pos = await Geolocator.getLastKnownPosition();
+      } catch (_) {}
+
+      // 2) get a fresh fix (medium accuracy is faster/more reliable than high)
+      try {
+        pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.medium,
+          timeLimit: const Duration(seconds: 12),
+        );
+      } catch (e) {
+        // if fresh fix failed but we have a last-known one, use that
+        if (pos == null) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Location unavailable: ${e.toString().replaceAll('PlatformException', '').trim()}. Try moving to an open area.')));
+          return;
+        }
+      }
+
+      if (pos == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not get a location fix — try again in an open area')));
+        return;
+      }
       if (!mounted) return;
       final here = LatLng(pos.latitude, pos.longitude);
       setState(() => _userLocation = here);
       _map.move(here, 16);
-    } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not get your location')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Location error: ${e.toString()}')));
     }
   }
 
