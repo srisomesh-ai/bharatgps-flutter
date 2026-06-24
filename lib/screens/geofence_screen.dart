@@ -324,6 +324,9 @@ class _GeofenceScreenState extends State<GeofenceScreen> {
             ),
           ),
         ),
+
+        // BOTTOM PANEL
+        Align(
           alignment: Alignment.bottomCenter,
           child: Container(
             decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(20)), boxShadow: [BoxShadow(color: Color(0x22000000), blurRadius: 16)]),
