@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'tour_keys.dart';
@@ -16,6 +17,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Map<String, dynamic>> _devices = [];
   bool _loading = true;
   String _filter = '';
+  Timer? _refresh;
 
   @override
   void initState() {
@@ -25,9 +27,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _loading = false;
     }
     _load();
+    // keep the dashboard live, matching the map's 5s refresh
+    _refresh = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
   }
 
-  Future<void> _load() async {
+  @override
+  void dispose() {
+    _refresh?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
     try {
       final d = await ApiService.getDevices();
       if (!mounted) return;
@@ -35,7 +45,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _devices = d;
         _loading = false;
       });
-      _resolveAddresses(d);
+      if (!silent) _resolveAddresses(d);
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
