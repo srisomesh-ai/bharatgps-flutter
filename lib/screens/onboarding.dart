@@ -164,16 +164,6 @@ class FeatureTour extends StatefulWidget {
 }
 
 class _TourStep {
-  final int tab;          // which nav tab this step lives on
-  final GlobalKey? key;   // target widget (null = centered intro card)
-  final String emoji;
-  final String title;
-  final String text;
-  final bool round;       // circular target (map control buttons)
-  const _TourStep({required this.tab, this.key, required this.emoji, required this.title, required this.text, this.round = false});
-}
-
-class _TourStep {
   final int tab;
   final GlobalKey? key;
   final String emoji;
