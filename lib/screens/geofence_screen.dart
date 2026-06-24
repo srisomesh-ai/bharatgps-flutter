@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 
@@ -31,14 +32,63 @@ class _GeofenceScreenState extends State<GeofenceScreen> {
   List<Map<String, dynamic>> _geofences = [];
   bool _loadingList = false;
 
+  // reference overlays: vehicles (static snapshot) + user's live location
+  List<Map<String, dynamic>> _vehicles = [];
+  LatLng? _userLocation;
+
   static const _colors = ['#0E5C5C', '#F5A623', '#C0392B', '#2980B9', '#27AE60', '#8E44AD'];
 
   Color _hex(String h) => Color(int.parse('FF${h.replaceFirst('#', '')}', radix: 16));
+  double _toD(dynamic v) => double.tryParse('$v') ?? 0;
 
   @override
   void initState() {
     super.initState();
     _loadList();
+    _loadVehicles();
+  }
+
+  // load vehicles once as a static snapshot (reference points while drawing)
+  Future<void> _loadVehicles() async {
+    try {
+      final d = await ApiService.getDevices();
+      if (!mounted) return;
+      setState(() => _vehicles = d.where((u) => _toD(u['lat']) != 0 && _toD(u['lng']) != 0).toList());
+      // center the map on the first vehicle so the user starts near their fleet
+      if (_vehicles.isNotEmpty && _center == null && _poly.isEmpty) {
+        final u = _vehicles.first;
+        _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 13);
+      }
+    } catch (_) {}
+  }
+
+  // user's LIVE location (blue dot) — same as the main map
+  Future<void> _goToMyLocation() async {
+    Haptics.medium();
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        _snack('Please turn on GPS/location on your phone');
+        return;
+      }
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+        _snack('Location permission denied');
+        return;
+      }
+      Position? pos;
+      try { pos = await Geolocator.getLastKnownPosition(); } catch (_) {}
+      try {
+        pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium, timeLimit: const Duration(seconds: 12));
+      } catch (_) {}
+      if (pos == null) { _snack('Could not get your location'); return; }
+      if (!mounted) return;
+      final here = LatLng(pos.latitude, pos.longitude);
+      setState(() => _userLocation = here);
+      _map.move(here, 16);
+    } catch (_) {
+      _snack('Could not get your location');
+    }
   }
 
   @override
@@ -189,6 +239,44 @@ class _GeofenceScreenState extends State<GeofenceScreen> {
                 point: p, width: 14, height: 14,
                 child: Container(decoration: BoxDecoration(color: _hex(_color), shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2))),
               )).toList()),
+            // VEHICLES (static snapshot) — reference points so the user can draw
+            // a fence around a vehicle. Non-tappable so they don't block drawing.
+            if (_vehicles.isNotEmpty)
+              IgnorePointer(
+                child: MarkerLayer(markers: _vehicles.map((u) => Marker(
+                  point: LatLng(_toD(u['lat']), _toD(u['lng'])),
+                  width: 90, height: 46,
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(5)),
+                      child: Text('${u['name'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w600)),
+                    ),
+                    const SizedBox(height: 1),
+                    Container(
+                      width: 22, height: 22,
+                      decoration: BoxDecoration(color: AppColors.teal, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 4)]),
+                      child: const Icon(Icons.directions_car, color: Colors.white, size: 12),
+                    ),
+                  ]),
+                )).toList()),
+              ),
+            // USER LIVE location (blue dot)
+            if (_userLocation != null)
+              MarkerLayer(markers: [
+                Marker(
+                  point: _userLocation!,
+                  width: 26, height: 26,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A73E8),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: [BoxShadow(color: const Color(0xFF1A73E8).withOpacity(0.5), blurRadius: 10, spreadRadius: 2)],
+                    ),
+                  ),
+                ),
+              ]),
           ],
         ),
 
@@ -219,8 +307,23 @@ class _GeofenceScreenState extends State<GeofenceScreen> {
           ]),
         ),
 
-        // BOTTOM PANEL
-        Align(
+        // LOCATE ME button (live user location) — right side, below search
+        Positioned(
+          top: 64, right: 12,
+          child: Material(
+            color: Colors.white,
+            shape: const CircleBorder(),
+            elevation: 3,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _goToMyLocation,
+              child: const Padding(
+                padding: EdgeInsets.all(10),
+                child: Icon(Icons.my_location, color: AppColors.teal, size: 22),
+              ),
+            ),
+          ),
+        ),
           alignment: Alignment.bottomCenter,
           child: Container(
             decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(20)), boxShadow: [BoxShadow(color: Color(0x22000000), blurRadius: 16)]),
