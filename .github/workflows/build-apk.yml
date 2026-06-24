@@ -42,6 +42,53 @@ jobs:
           cp -r /tmp/keep/raw/* android/app/src/main/res/raw/ 2>/dev/null || true
           cp /tmp/keep/google-services.json android/app/google-services.json 2>/dev/null || true
 
+      - name: Set Play Store package name (com.bharatgpstrackerclient.android)
+        run: |
+          python3 - <<'PY'
+          import os, re, glob, shutil
+          PKG = 'com.bharatgpstrackerclient.android'
+          # ---- app build.gradle(.kts): applicationId + namespace ----
+          groovy='android/app/build.gradle'; kts='android/app/build.gradle.kts'
+          p = groovy if os.path.exists(groovy) else kts
+          kotlin = p.endswith('.kts')
+          s=open(p).read()
+          if kotlin:
+              s=re.sub(r'applicationId\s*=\s*"[^"]*"', f'applicationId = "{PKG}"', s)
+              s=re.sub(r'namespace\s*=\s*"[^"]*"', f'namespace = "{PKG}"', s)
+          else:
+              s=re.sub(r'applicationId\s+"[^"]*"', f'applicationId "{PKG}"', s)
+              s=re.sub(r'namespace\s+"[^"]*"', f'namespace "{PKG}"', s)
+          open(p,'w').write(s)
+          print('applicationId + namespace ->', PKG)
+
+          # ---- AndroidManifest: package attribute (if present) ----
+          mani='android/app/src/main/AndroidManifest.xml'
+          m=open(mani).read()
+          m=re.sub(r'package="[^"]*"', f'package="{PKG}"', m)
+          open(mani,'w').write(m)
+
+          # ---- MainActivity: move into the correct package path + fix package line ----
+          for ext in ('kt','java'):
+              folder = 'kotlin' if ext=='kt' else 'java'
+              hits=glob.glob(f'android/app/src/main/{folder}/**/MainActivity.{ext}', recursive=True)
+              if hits:
+                  src=hits[0]
+                  base=f'android/app/src/main/{folder}'
+                  newdir=os.path.join(base, *PKG.split('.'))
+                  os.makedirs(newdir, exist_ok=True)
+                  content=open(src).read()
+                  content=re.sub(r'package\s+[\w\.]+', f'package {PKG}', content)
+                  dst=os.path.join(newdir, f'MainActivity.{ext}')
+                  open(dst,'w').write(content)
+                  if os.path.abspath(src) != os.path.abspath(dst):
+                      oldtop=os.path.join(base,'com','bharatgps')
+                      if os.path.isdir(oldtop):
+                          shutil.rmtree(oldtop, ignore_errors=True)
+                  print('MainActivity ->', dst)
+                  break
+          PY
+          echo "package name set to com.bharatgpstrackerclient.android"
+
       - name: Show generated android gradle files (debug)
         run: |
           echo "---- android/app ----"; ls -la android/app | grep -i gradle || true
@@ -101,6 +148,14 @@ jobs:
               s=re.sub(r'(<application)', r'\1 android:usesCleartextTraffic="true"', s, count=1)
           open(p,'w').write(s)
           print('manifest patched')
+          # verify location permission actually landed
+          check=open(p).read()
+          if 'ACCESS_FINE_LOCATION' in check:
+              print('✓ ACCESS_FINE_LOCATION present in manifest')
+          else:
+              print('✗ WARNING: ACCESS_FINE_LOCATION MISSING — location will fail!')
+              print('--- manifest head ---')
+              print(check[:500])
           PY
 
       - name: Patch MainActivity for local_auth (FlutterFragmentActivity)
