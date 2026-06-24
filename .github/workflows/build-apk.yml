@@ -88,6 +88,8 @@ jobs:
               s=re.sub(r'(<manifest[^>]*>)', r'\1\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>', s, count=1)
           if 'android.permission.VIBRATE' not in s:
               s=re.sub(r'(<manifest[^>]*>)', r'\1\n    <uses-permission android:name="android.permission.VIBRATE"/>', s, count=1)
+          if 'ACCESS_FINE_LOCATION' not in s:
+              s=re.sub(r'(<manifest[^>]*>)', r'\1\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>', s, count=1)
           if 'USE_BIOMETRIC' not in s:
               s=re.sub(r'(<manifest[^>]*>)', r'\1\n    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>\n    <uses-permission android:name="android.permission.USE_FINGERPRINT"/>', s, count=1)
           # allow launching maps/geo intents + WhatsApp (Android 11+ visibility)
@@ -211,6 +213,15 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
+
+      - name: Verify geolocator resolved
+        run: |
+          if flutter pub deps 2>/dev/null | grep -q geolocator; then
+            echo "✓ geolocator resolved OK"
+          else
+            echo "✗ geolocator NOT resolved — running pub get again with verbose"
+            flutter pub get -v 2>&1 | tail -40
+          fi
 
       - name: Patch plugin gradle files (remove dead jcenter repo)
         run: |
