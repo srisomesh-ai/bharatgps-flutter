@@ -1208,7 +1208,17 @@ class _PlaybackPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final presets = {'Today': 1, '7 Days': 7, '14 Days': 14, '30 Days': 30};
+    // each preset resolves to a from/to date range
+    final now = DateTime.now();
+    DateTime dayStart(DateTime d) => DateTime(d.year, d.month, d.day, 0, 0, 0);
+    DateTime dayEnd(DateTime d) => DateTime(d.year, d.month, d.day, 23, 59, 59);
+    final yesterday = now.subtract(const Duration(days: 1));
+    final twoDaysAgo = now.subtract(const Duration(days: 1)); // last 2 days = yesterday + today
+    final presets = <String, Map<String, DateTime>>{
+      'Today': {'from': dayStart(now), 'to': dayEnd(now)},
+      'Yesterday': {'from': dayStart(yesterday), 'to': dayEnd(yesterday)},
+      'Last 2 Days': {'from': dayStart(twoDaysAgo), 'to': dayEnd(now)},
+    };
     return Container(
       decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       padding: EdgeInsets.fromLTRB(20, 10, 20, 20 + MediaQuery.of(context).padding.bottom),
@@ -1229,7 +1239,7 @@ class _PlaybackPicker extends StatelessWidget {
               onTap: () {
                 Haptics.select();
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => HistoryMapScreen(device: device, days: e.value)));
+                Navigator.push(context, MaterialPageRoute(builder: (_) => HistoryMapScreen(device: device, from: e.value['from'], to: e.value['to'])));
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
