@@ -27,8 +27,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _loading = false;
     }
     _load();
-    // keep the dashboard live, matching the map's 5s refresh
-    _refresh = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
+    // poll every 10s, but ONLY when the Dashboard tab is the visible one
+    // (reduces server load — hidden tabs don't call the server)
+    _refresh = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (MainShell.currentTab.value == 0) _load(silent: true);
+    });
   }
 
   @override
