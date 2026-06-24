@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,7 +36,7 @@ jobs:
         run: rm -rf android
 
       - name: Regenerate Android scaffolding
-        run: flutter create . --platforms=android --org com.bharatgps
+        run: flutter create . --platforms=android --org com.bharatgpstrackerclient --project-name bharatgps_app
 
       - name: Restore custom files
         run: |
@@ -47,24 +49,34 @@ jobs:
           python3 - <<'PY'
           import os, re, glob, shutil
           PKG = 'com.bharatgpstrackerclient.android'
+          OLD = 'com.bharatgps.bharatgps_app'
           # ---- app build.gradle(.kts): applicationId + namespace ----
           groovy='android/app/build.gradle'; kts='android/app/build.gradle.kts'
           p = groovy if os.path.exists(groovy) else kts
           kotlin = p.endswith('.kts')
           s=open(p).read()
-          if kotlin:
-              s=re.sub(r'applicationId\s*=\s*"[^"]*"', f'applicationId = "{PKG}"', s)
-              s=re.sub(r'namespace\s*=\s*"[^"]*"', f'namespace = "{PKG}"', s)
-          else:
-              s=re.sub(r'applicationId\s+"[^"]*"', f'applicationId "{PKG}"', s)
-              s=re.sub(r'namespace\s+"[^"]*"', f'namespace "{PKG}"', s)
+          print('--- BEFORE (applicationId/namespace lines) ---')
+          for line in s.splitlines():
+              if 'applicationId' in line or 'namespace' in line:
+                  print('  ', line.strip())
+          # 1) regex replace applicationId + namespace assignments (kts or groovy)
+          s=re.sub(r'(applicationId\s*=?\s*)"[^"]*"', r'\1"%s"' % PKG, s)
+          s=re.sub(r'(namespace\s*=?\s*)"[^"]*"', r'\1"%s"' % PKG, s)
+          # 2) brute-force: replace any leftover literal of the old package
+          s=s.replace(OLD, PKG)
+          s=s.replace('com.bharatgpstrackerclient.bharatgps_app', PKG)
+          s=s.replace('com.example.bharatgps_app', PKG)
           open(p,'w').write(s)
-          print('applicationId + namespace ->', PKG)
+          print('--- AFTER (applicationId/namespace lines) ---')
+          for line in s.splitlines():
+              if 'applicationId' in line or 'namespace' in line:
+                  print('  ', line.strip())
 
-          # ---- AndroidManifest: package attribute (if present) ----
+          # ---- AndroidManifest: package attribute + any old literal ----
           mani='android/app/src/main/AndroidManifest.xml'
           m=open(mani).read()
           m=re.sub(r'package="[^"]*"', f'package="{PKG}"', m)
+          m=m.replace(OLD, PKG).replace('com.bharatgpstrackerclient.bharatgps_app', PKG)
           open(mani,'w').write(m)
 
           # ---- MainActivity: move into the correct package path + fix package line ----
@@ -78,14 +90,31 @@ jobs:
                   os.makedirs(newdir, exist_ok=True)
                   content=open(src).read()
                   content=re.sub(r'package\s+[\w\.]+', f'package {PKG}', content)
+                  content=content.replace(OLD, PKG).replace('com.bharatgpstrackerclient.bharatgps_app', PKG)
                   dst=os.path.join(newdir, f'MainActivity.{ext}')
                   open(dst,'w').write(content)
                   if os.path.abspath(src) != os.path.abspath(dst):
                       oldtop=os.path.join(base,'com','bharatgps')
                       if os.path.isdir(oldtop):
                           shutil.rmtree(oldtop, ignore_errors=True)
+                      # also remove the intermediate bharatgps_app path if different
+                      interm=os.path.join(base,'com','bharatgpstrackerclient','bharatgps_app')
+                      if os.path.isdir(interm) and os.path.abspath(interm) != os.path.abspath(newdir):
+                          shutil.rmtree(interm, ignore_errors=True)
                   print('MainActivity ->', dst)
                   break
+
+          # ---- verify google-services.json has this package ----
+          import json
+          gs='android/app/google-services.json'
+          if os.path.exists(gs):
+              j=json.load(open(gs))
+              pkgs=[c['client_info']['android_client_info']['package_name'] for c in j['client']]
+              print('google-services packages:', pkgs)
+              if PKG in pkgs:
+                  print('✓ google-services.json HAS', PKG)
+              else:
+                  print('✗ WARNING: google-services.json MISSING', PKG)
           PY
           echo "package name set to com.bharatgpstrackerclient.android"
 
@@ -285,8 +314,81 @@ jobs:
           find ~/.pub-cache -name "build.gradle" -path "*android*" -exec sed -i '/jcenter()/d' {} + 2>/dev/null || true
           echo "patched plugin gradle files"
 
+      - name: Set up release signing (from GitHub Secrets)
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "Decoding keystore..."
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.jks
+          cat > android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=release.jks
+          EOF
+          echo "key.properties created"
+          # wire signingConfig into app build.gradle(.kts)
+          python3 - <<'PY'
+          import os, re
+          groovy='android/app/build.gradle'; kts='android/app/build.gradle.kts'
+          p = groovy if os.path.exists(groovy) else kts
+          kotlin = p.endswith('.kts')
+          s=open(p).read()
+          if kotlin:
+              # load key.properties at top
+              if 'keystoreProperties' not in s:
+                  loader=('import java.util.Properties\nimport java.io.FileInputStream\n'
+                          'val keystoreProperties = Properties()\n'
+                          'val keystorePropertiesFile = rootProject.file("key.properties")\n'
+                          'if (keystorePropertiesFile.exists()) { keystoreProperties.load(FileInputStream(keystorePropertiesFile)) }\n\n')
+                  s = loader + s
+              if 'signingConfigs' not in s:
+                  block=('    signingConfigs {\n'
+                         '        create("release") {\n'
+                         '            keyAlias = keystoreProperties["keyAlias"] as String?\n'
+                         '            keyPassword = keystoreProperties["keyPassword"] as String?\n'
+                         '            storeFile = keystoreProperties["storeFile"]?.let { file(it) }\n'
+                         '            storePassword = keystoreProperties["storePassword"] as String?\n'
+                         '        }\n'
+                         '    }\n')
+                  s=re.sub(r'(android\s*\{)', r'\1\n'+block, s, count=1)
+              s=re.sub(r'signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)',
+                       'signingConfig = signingConfigs.getByName("release")', s)
+              if 'getByName("release")' not in s.split('buildTypes')[-1]:
+                  s=re.sub(r'(getByName\("release"\)\s*\{)', r'\1\n            signingConfig = signingConfigs.getByName("release")', s, count=1)
+          else:
+              if 'keystoreProperties' not in s:
+                  loader=('def keystoreProperties = new Properties()\n'
+                          'def keystorePropertiesFile = rootProject.file("key.properties")\n'
+                          'if (keystorePropertiesFile.exists()) { keystoreProperties.load(new FileInputStream(keystorePropertiesFile)) }\n\n')
+                  s = loader + s
+              if 'signingConfigs' not in s:
+                  block=('    signingConfigs {\n'
+                         '        release {\n'
+                         '            keyAlias keystoreProperties["keyAlias"]\n'
+                         '            keyPassword keystoreProperties["keyPassword"]\n'
+                         '            storeFile keystoreProperties["storeFile"] ? file(keystoreProperties["storeFile"]) : null\n'
+                         '            storePassword keystoreProperties["storePassword"]\n'
+                         '        }\n'
+                         '    }\n')
+                  s=re.sub(r'(android\s*\{)', r'\1\n'+block, s, count=1)
+              s=re.sub(r'signingConfig\s+signingConfigs\.debug',
+                       'signingConfig signingConfigs.release', s)
+              if 'signingConfigs.release' not in s.split('buildTypes')[-1]:
+                  s=re.sub(r'(release\s*\{)', r'\1\n            signingConfig signingConfigs.release', s, count=1)
+          open(p,'w').write(s)
+          print('signing config wired in')
+          PY
+
       - name: Build release APK
         run: flutter build apk --release
+
+      - name: Build release App Bundle (.aab for Play Store)
+        run: flutter build appbundle --release
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -294,3 +396,10 @@ jobs:
           name: bharatgps-app-release
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+
+      - name: Upload AAB artifact (Play Store)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bharatgps-app-bundle
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: warn
