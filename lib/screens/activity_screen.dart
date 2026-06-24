@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'tour_keys.dart';
@@ -19,6 +20,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
   final Map<String, Map<String, dynamic>> _stats = {};
   final Set<String> _loadingStats = {};
   double _fleetKm = 0;
+  Timer? _refresh;
 
   @override
   void initState() {
@@ -28,6 +30,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
       _loading = false;
     }
     _load();
+    // keep fleet activity live, matching the map's 5s refresh
+    _refresh = Timer.periodic(const Duration(seconds: 5), (_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _refresh?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
