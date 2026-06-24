@@ -66,6 +66,11 @@ class NotificationService {
   static final _fln = FlutterLocalNotificationsPlugin();
   static String? _fcmToken;
   static const _prefKey = 'bgps_alert_sound';
+  // Bump this when sound files change. Android locks a channel's sound at
+  // creation, so a new version forces fresh channels that pick up the .wav/.mp3
+  // sounds (old silent channels are deleted on init).
+  static const _chanVer = 'v2';
+  static String _chanId(String soundId) => 'bgps_alerts_${_chanVer}_$soundId';
 
   /// Alert types that can each have their own sound.
   static const alertTypes = <String, String>{
@@ -136,6 +141,17 @@ class NotificationService {
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
     await _fln.initialize(initSettings);
+    final android = _fln.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    // remove old (possibly silent) channels from previous versions so the
+    // fresh versioned channels below pick up the correct sound files
+    try {
+      final existing = await android?.getNotificationChannels();
+      for (final c in existing ?? []) {
+        if (c.id.startsWith('bgps_alerts_') && !c.id.startsWith('bgps_alerts_${_chanVer}_')) {
+          await android?.deleteNotificationChannel(c.id);
+        }
+      }
+    } catch (_) {}
     // create a channel for every bundled sound up-front
     for (final s in kAlertSounds) {
       await _ensureChannel(s);
@@ -144,7 +160,7 @@ class NotificationService {
 
   static AndroidNotificationChannel _channelFor(AlertSound s) {
     return AndroidNotificationChannel(
-      'bgps_alerts_${s.id}',
+      _chanId(s.id),
       'Alerts — ${s.label}',
       description: 'BharatGPS vehicle alerts (${s.label})',
       importance: Importance.high,
@@ -167,7 +183,7 @@ class NotificationService {
     final type = (m.data['type'] ?? m.data['alert_type'] ?? _guessAlertType('$title $body'))?.toString();
     final sound = (type != null && type.isNotEmpty) ? await soundForType(type) : await currentSound();
     final details = AndroidNotificationDetails(
-      'bgps_alerts_${sound.id}',
+      _chanId(sound.id),
       'Alerts — ${sound.label}',
       channelDescription: 'BharatGPS vehicle alerts',
       importance: Importance.high,
@@ -192,7 +208,7 @@ class NotificationService {
       await _ensureChannel(s);
       await _fln.show(99999, 'Sound preview', 'Default notification tone',
           NotificationDetails(android: AndroidNotificationDetails(
-            'bgps_alerts_default', 'Alerts — Default',
+            _chanId('default'), 'Alerts — Default',
             importance: Importance.high, priority: Priority.high, playSound: true,
             icon: '@mipmap/ic_launcher',
           )));
@@ -297,7 +313,7 @@ class NotificationService {
     // pick the sound chosen for this alert type (falls back to global, then default)
     final sound = type != null ? await soundForType(type) : await currentSound();
     final details = AndroidNotificationDetails(
-      'bgps_alerts_${sound.id}',
+      _chanId(sound.id),
       'Alerts — ${sound.label}',
       channelDescription: 'BharatGPS vehicle alerts',
       importance: Importance.high,
