@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'main_shell.dart';
 import 'tour_keys.dart';
 import '../services/api_service.dart';
 import '../widgets/bottom_nav.dart';
@@ -31,7 +32,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
     }
     _load();
     // keep fleet activity live, matching the map's 5s refresh
-    _refresh = Timer.periodic(const Duration(seconds: 5), (_) => _load());
+    _refresh = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (MainShell.currentTab.value == 1) _load();
+    });
   }
 
   @override
