@@ -64,7 +64,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     MainShell.mapFocusId.addListener(_onFocusRequested);
     _load();
     _loadGprs();
-    _refresh = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
+    _refresh = Timer.periodic(const Duration(seconds: 5), (_) {
+      // only hit the server while the Map tab is actually visible
+      if (MainShell.currentTab.value == 2) _load(silent: true);
+    });
     _ticker = createTicker(_onTick)..start();
   }
 
