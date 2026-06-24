@@ -197,7 +197,27 @@ class ApiService {
         'rssi': xmlTag('rssi'),
         'alarm': d['alarm'],
       },
+      // engine-cut capability: the device has a 'blocked' sensor (logical template).
+      // Only such devices actually have the engine-cut relay configured.
+      'hasCutSensor': _deviceHasBlockedSensor(d),
     };
+  }
+
+  // True if the device has a sensor whose tag/name is 'blocked' (the logical
+  // template parameter used for engine cut-off). Devices without this sensor
+  // do NOT have engine-cut, so the option must be hidden for them.
+  static bool _deviceHasBlockedSensor(Map d) {
+    final sensors = d['sensors'];
+    if (sensors is List) {
+      for (final s in sensors) {
+        if (s is Map) {
+          final tag = '${s['tag_name'] ?? ''}'.toLowerCase().trim();
+          final name = '${s['name'] ?? ''}'.toLowerCase().trim();
+          if (tag == 'blocked' || name == 'blocked') return true;
+        }
+      }
+    }
+    return false;
   }
 
   // returns the first non-empty, non-zero date string, else null
