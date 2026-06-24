@@ -19,6 +19,10 @@ class MainShell extends StatefulWidget {
   // a vehicle id the map should focus on when it next becomes visible
   static final ValueNotifier<dynamic> mapFocusId = ValueNotifier<dynamic>(null);
 
+  // the currently visible tab index — screens watch this and only poll the
+  // server when they are the active tab (reduces server load a lot).
+  static final ValueNotifier<int> currentTab = ValueNotifier<int>(0);
+
   @override
   State<MainShell> createState() => _MainShellState();
 }
@@ -35,9 +39,16 @@ class _MainShellState extends State<MainShell> {
     ProfileScreen(),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    MainShell.currentTab.value = _index;
+  }
+
   void goTo(int i) {
     if (i == _index) return;
     setState(() => _index = i);
+    MainShell.currentTab.value = i;
   }
 
   // switch to the Map tab and tell it which vehicle to focus
@@ -45,6 +56,7 @@ class _MainShellState extends State<MainShell> {
     MainShell.mapFocusId.value = null; // reset so the same id re-fires
     MainShell.mapFocusId.value = deviceId;
     setState(() => _index = 2);
+    MainShell.currentTab.value = 2;
   }
 
   @override
