@@ -791,57 +791,57 @@ class ApiService {
     String? geofenceDirection, // 'in' | 'out' | 'in_out'
   }) async {
     // map our friendly types to the GPSWOX server type + extra params.
-    // Real server types (from get_alerts_attributes): overspeed, move_duration,
-    // stop_duration, offline_duration, idle_duration, ignition_duration,
-    // ignition (state on/off), move_start, geofence_in, geofence_out.
+    // REAL server types (from API spec /add_alert + /get_alerts_attributes):
+    // overspeed, stop_duration, idle_duration, ignition_duration,
+    // offline_duration, move_duration, distance, geofence_in/out/inout,
+    // driver, poi_stop_duration, poi_idle_duration, custom.
     String serverType = type;
     final extra = <String, dynamic>{};
     switch (type) {
       case 'engine_on':
-        serverType = 'ignition';
-        extra['ignition'] = 'on';
-        break;
       case 'engine_off':
-        serverType = 'ignition';
-        extra['ignition'] = 'off';
-        break;
       case 'ignition_duration':
-        serverType = 'ignition'; // engine on/off events
+        serverType = 'ignition_duration';
+        extra['ignition_duration'] = ignitionDuration ?? 1;
         break;
-      case 'move_duration':
       case 'movement':
+      case 'move_duration':
         serverType = 'move_duration';
         extra['move_duration'] = moveDuration ?? 1;
+        extra['min_parking_duration'] = 1;
         break;
       case 'offline':
-        serverType = 'offline_duration'; // real server type
+      case 'powercut': // GPSWOX has no power-cut type; offline_duration is the
+                       // closest real signal (device stops reporting when power
+                       // is cut). Use offline_duration.
+        serverType = 'offline_duration';
         extra['offline_duration'] = moveDuration ?? 10;
         break;
-      case 'online':
-        // "device back online" — server reports this via ignition/move_start;
-        // the closest real attribute is offline_duration with online flag, but
-        // GPSWOX exposes it as the `device_online` event on many builds.
-        serverType = 'online';
+      case 'idle':
+      case 'idle_duration':
+        serverType = 'idle_duration';
+        extra['idle_duration'] = moveDuration ?? 5;
         break;
-      case 'powercut':
-        // power cut = external power disconnected. On GPSWOX this is commonly
-        // the `device_offline`/`offline_duration` with charge, but the direct
-        // type is often unsupported. Try 'offline_duration' as the safe fallback.
-        serverType = 'offline_duration';
-        extra['offline_duration'] = moveDuration ?? 5;
-        break;
-      case 'lowbattery':
-        serverType = 'low_battery';
+      case 'stop':
+      case 'stop_duration':
+        serverType = 'stop_duration';
+        extra['stop_duration'] = moveDuration ?? 5;
         break;
       case 'geofence':
+        serverType = 'geofence_inout';
         final dir = geofenceDirection ?? 'in_out';
-        if (dir == 'in_out') {
-          final inOk = await createAlert(type: 'geofence', name: '$name (Enter)', devices: devices, geofenceId: geofenceId, geofenceDirection: 'in');
-          final outOk = await createAlert(type: 'geofence', name: '$name (Exit)', devices: devices, geofenceId: geofenceId, geofenceDirection: 'out');
-          return inOk || outOk;
+        if (dir == 'in') serverType = 'geofence_in';
+        else if (dir == 'out') serverType = 'geofence_out';
+        // else geofence_inout (handles both in one alert)
+        if (geofenceId != null) {
+          extra['geofences'] = [geofenceId];
+          extra['zones'] = [geofenceId];
+          extra['zone'] = dir == 'out' ? 2 : 1;
         }
-        serverType = dir == 'in' ? 'geofence_in' : 'geofence_out';
-        if (geofenceId != null) extra['geofences'] = [geofenceId];
+        break;
+      case 'overspeed':
+        serverType = 'overspeed';
+        extra['overspeed'] = overspeed ?? 60;
         break;
     }
 
@@ -856,9 +856,6 @@ class ApiService {
       },
       ...extra,
     };
-    if (type == 'overspeed') payload['overspeed'] = overspeed ?? 60;
-    if (type == 'move_duration') payload['move_duration'] = moveDuration ?? 1;
-    if (type == 'ignition_duration') payload['ignition_duration'] = ignitionDuration ?? 1;
 
     final res = await http.post(
       _u(host!, 'add_alert', {'lang': 'en', 'user_api_hash': hash!}),
