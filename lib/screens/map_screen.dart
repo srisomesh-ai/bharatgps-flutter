@@ -282,6 +282,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   double _toD(dynamic v) => double.tryParse('$v') ?? 0;
 
+  // A device has an engine-cut relay if it reports a 'blocked' parameter.
+  // (Like ignition reports engine on/off, blocked reports the cut-relay state.)
+  // No 'blocked' value = no relay installed = don't show the cut option.
+  bool _hasCutRelay(Map<String, dynamic> u) {
+    final ts = (u['ts'] is Map) ? u['ts'] as Map : const {};
+    final blocked = ts['blocked'];
+    if (blocked == null) return false;
+    final s = '$blocked'.trim().toLowerCase();
+    // present and a real boolean-ish value means the relay reports state
+    return s == 'true' || s == 'false' || s == '1' || s == '0';
+  }
+
   // vehicles matching the current search
   List<Map<String, dynamic>> _visibleDevices({bool needLatLng = false}) {
     return _devices.where((u) {
@@ -413,7 +425,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       builder: (_) => _VehicleDetailSheet(
         device: u,
-        supportsCutoff: _gprsDevices.contains('${u['id']}'),
+        // Show Engine Cut-Off ONLY if this device actually has the relay.
+        // A device with an engine-cut relay reports a 'blocked' parameter
+        // (just like ignition reports engine on/off). No 'blocked' = no relay.
+        supportsCutoff: _hasCutRelay(u),
       ),
     );
   }
