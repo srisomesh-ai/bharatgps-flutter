@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart';
 import '../theme/app_theme.dart';
 import 'tour_keys.dart';
 import 'main_shell.dart';
@@ -33,6 +34,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   // geofence overlay (additive — does not affect vehicle markers)
   bool _showGeofences = false;
   List<Map<String, dynamic>> _geofenceShapes = [];
+  LatLng? _userLocation; // phone GPS position
   Map<String, dynamic>? _selected; // for the mini-card
   Timer? _refresh;
   final Map<String, String> _addrCache = {};
@@ -199,6 +201,30 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Future<void> _loadGprs() async {
     final g = await ApiService.getCommandDevices();
     if (mounted) setState(() => _gprsDevices = g);
+  }
+
+  // ===== User's own GPS location =====
+  Future<void> _goToMyLocation() async {
+    Haptics.medium();
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please turn on GPS/location on your phone')));
+        return;
+      }
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Location permission denied')));
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      if (!mounted) return;
+      final here = LatLng(pos.latitude, pos.longitude);
+      setState(() => _userLocation = here);
+      _map.move(here, 16);
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not get your location')));
+    }
   }
 
   // ===== Geofence overlay (additive — independent of vehicle markers) =====
@@ -507,6 +533,21 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   ],
                   PolylineLayer(polylines: _tailPolylines()),
                   MarkerLayer(markers: _markers()),
+                  if (_userLocation != null)
+                    MarkerLayer(markers: [
+                      Marker(
+                        point: _userLocation!,
+                        width: 26, height: 26,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A73E8),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [BoxShadow(color: const Color(0xFF1A73E8).withOpacity(0.5), blurRadius: 10, spreadRadius: 2)],
+                          ),
+                        ),
+                      ),
+                    ]),
                 ],
               ),
               if (_loading)
@@ -549,25 +590,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               Positioned(
                 right: 14, top: 70,
                 child: Column(children: [
-                  KeyedSubtree(key: TourKeys.mapLocate, child: _mapCtrl(Icons.my_location, () {
-                    Haptics.medium();
-                    // gather all vehicles that have a valid position
-                    final pts = <LatLng>[];
-                    for (final u in _devices) {
-                      final la = _toD(u['lat']), ln = _toD(u['lng']);
-                      if (la != 0 && ln != 0) pts.add(LatLng(la, ln));
-                    }
-                    if (pts.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No vehicle positions available')));
-                      return;
-                    }
-                    if (pts.length == 1) {
-                      _map.move(pts.first, 15);
-                    } else {
-                      // fit the map to show all vehicles
-                      _map.fitCamera(CameraFit.coordinates(coordinates: pts, padding: const EdgeInsets.all(60)));
-                    }
-                  })),
+                  KeyedSubtree(key: TourKeys.mapLocate, child: _mapCtrl(Icons.my_location, _goToMyLocation)),
                   const SizedBox(height: 12),
                   // SHARE this vehicle's live tracking (replaces duplicate layers toggle)
                   KeyedSubtree(key: TourKeys.mapShare, child: _mapCtrl(Icons.share, () {
