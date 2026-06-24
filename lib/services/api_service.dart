@@ -790,34 +790,52 @@ class ApiService {
     int? geofenceId,
     String? geofenceDirection, // 'in' | 'out' | 'in_out'
   }) async {
-    // map our friendly types to the GPSWOX server type + extra params
+    // map our friendly types to the GPSWOX server type + extra params.
+    // Real server types (from get_alerts_attributes): overspeed, move_duration,
+    // stop_duration, offline_duration, idle_duration, ignition_duration,
+    // ignition (state on/off), move_start, geofence_in, geofence_out.
     String serverType = type;
     final extra = <String, dynamic>{};
     switch (type) {
       case 'engine_on':
-        serverType = 'ignition'; // ignition event
+        serverType = 'ignition';
         extra['ignition'] = 'on';
         break;
       case 'engine_off':
         serverType = 'ignition';
         extra['ignition'] = 'off';
         break;
+      case 'ignition_duration':
+        serverType = 'ignition'; // engine on/off events
+        break;
+      case 'move_duration':
+      case 'movement':
+        serverType = 'move_duration';
+        extra['move_duration'] = moveDuration ?? 1;
+        break;
       case 'offline':
-        serverType = 'device_offline'; // device stopped reporting
-        extra['offline_duration'] = moveDuration ?? 10; // minutes offline before alerting
+        serverType = 'offline_duration'; // real server type
+        extra['offline_duration'] = moveDuration ?? 10;
+        break;
+      case 'online':
+        // "device back online" — server reports this via ignition/move_start;
+        // the closest real attribute is offline_duration with online flag, but
+        // GPSWOX exposes it as the `device_online` event on many builds.
+        serverType = 'online';
         break;
       case 'powercut':
-        serverType = 'power_cut';
+        // power cut = external power disconnected. On GPSWOX this is commonly
+        // the `device_offline`/`offline_duration` with charge, but the direct
+        // type is often unsupported. Try 'offline_duration' as the safe fallback.
+        serverType = 'offline_duration';
+        extra['offline_duration'] = moveDuration ?? 5;
         break;
       case 'lowbattery':
         serverType = 'low_battery';
         break;
       case 'geofence':
-        // Server only supports geofence_in and geofence_out (no combined type).
-        // For "Both", we create two alerts below. Field is `geofences` (multiselect).
         final dir = geofenceDirection ?? 'in_out';
         if (dir == 'in_out') {
-          // create both an enter and an exit alert
           final inOk = await createAlert(type: 'geofence', name: '$name (Enter)', devices: devices, geofenceId: geofenceId, geofenceDirection: 'in');
           final outOk = await createAlert(type: 'geofence', name: '$name (Exit)', devices: devices, geofenceId: geofenceId, geofenceDirection: 'out');
           return inOk || outOk;
