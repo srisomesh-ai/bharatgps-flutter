@@ -66,7 +66,7 @@ String stateOf(String? online, num? speed) {
 // A vehicle that briefly shows speed 0 (GPS glitch, traffic, signal) stays
 // "Running" until it has actually been still for STOP_GRACE. This prevents the
 // status flickering to Idle during normal driving.
-const int kStopGraceMs = 45000; // 45s, same as the web panel STOP_GRACE
+const int kStopGraceMs = 10000; // 10s — short grace to filter GPS glitches only, keeps status near-live
 final Map<String, int> _lastRunAt = {}; // deviceId -> last time it was running (ms)
 
 /// Returns the stable state for a device using the raw fields + a per-device
