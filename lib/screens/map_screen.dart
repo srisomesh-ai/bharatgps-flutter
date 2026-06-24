@@ -75,7 +75,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     // focus immediately if we already have the device loaded
     final u = _devices.firstWhere((e) => '${e['id']}' == '$id', orElse: () => {});
     if (u.isNotEmpty && u['lat'] != null) {
-      _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 15);
+      _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 17);
       setState(() => _selected = u);
       _focusId = null;
       MainShell.mapFocusId.value = null;
@@ -169,7 +169,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     if (!silent && _focusId != null) {
       final u = _devices.firstWhere((e) => '${e['id']}' == '$_focusId', orElse: () => {});
       if (u.isNotEmpty && u['lat'] != null) {
-        _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 15);
+        _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 17);
         setState(() => _selected = u);
       }
       _focusId = null;
@@ -329,7 +329,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   onTap: () {
                     Navigator.pop(context);
                     if (u['lat'] != null && u['lng'] != null) {
-                      _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 16);
+                      _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 18);
                       setState(() => _selected = u);
                     }
                   },
@@ -480,7 +480,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     final match = _devices.where((u) => (u['name'] ?? '').toString().toLowerCase().contains(q) && u['lat'] != null && u['lng'] != null);
                     if (match.isNotEmpty) {
                       final u = match.first;
-                      _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 16);
+                      _map.move(LatLng(_toD(u['lat']), _toD(u['lng'])), 18);
                       setState(() => _selected = u);
                     }
                   },
