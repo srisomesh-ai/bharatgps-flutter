@@ -426,7 +426,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         child: GestureDetector(
           onTap: () {
             setState(() => _selected = u);
-            _map.move(pos, _map.camera.zoom < 13 ? 14 : _map.camera.zoom);
+            // zoom in closer when focusing a vehicle (at least 16, or closer if already)
+            final z = _map.camera.zoom < 16 ? 16.0 : _map.camera.zoom;
+            _map.move(pos, z);
           },
           child: _VehicleMarker(device: u, state: s, heading: heading, pulse: _pulseValue, showName: _showNames, mapRotation: _mapRotation),
         ),
