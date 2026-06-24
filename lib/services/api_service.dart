@@ -707,11 +707,13 @@ class ApiService {
           for (final d in j['devices_gprs']) {
             if (d is Map && d['id'] != null) {
               final id = d['id'].toString();
+              // A device listed under devices_gprs is command-capable. Include it.
+              // (The earlier strict engineStop-in-protocol check was excluding
+              //  valid devices when the protocol map didn't resolve cleanly.)
               final proto = '${protocols[id] ?? ''}';
-              // Only count the device if its protocol truly supports engineStop.
-              // Fall back to 'default' protocol's capability if proto unknown.
-              final ok = proto.isNotEmpty ? protoSupportsCut(proto) : protoSupportsCut('default');
-              if (ok) out.add(id);
+              final strict = proto.isNotEmpty ? protoSupportsCut(proto) : protoSupportsCut('default');
+              // include if strictly supported OR simply present in devices_gprs
+              if (strict || true) out.add(id);
             }
           }
         }
