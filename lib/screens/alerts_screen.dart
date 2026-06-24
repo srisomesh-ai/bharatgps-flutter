@@ -383,6 +383,7 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
     {'t': 'engine_on', 'name': 'Engine ON', 'sub': 'Ignition turned on', 'icon': Icons.power_settings_new, 'color': AppColors.green, 'bg': AppColors.greenBg},
     {'t': 'engine_off', 'name': 'Engine OFF', 'sub': 'Ignition turned off', 'icon': Icons.power_off, 'color': AppColors.ink2, 'bg': AppColors.bg},
     {'t': 'offline', 'name': 'Offline', 'sub': 'Device stops reporting', 'icon': Icons.wifi_off, 'color': AppColors.red, 'bg': AppColors.redBg},
+    {'t': 'online', 'name': 'Online', 'sub': 'Device back online', 'icon': Icons.wifi, 'color': AppColors.green, 'bg': AppColors.greenBg},
     {'t': 'powercut', 'name': 'Power Cut', 'sub': 'GPS unplugged', 'icon': Icons.flash_on, 'color': AppColors.orange, 'bg': AppColors.orangeBg},
     {'t': 'lowbattery', 'name': 'Low Battery', 'sub': 'Below threshold', 'icon': Icons.battery_alert, 'color': AppColors.violet, 'bg': AppColors.violetBg},
     {'t': 'geofence', 'name': 'Geofence', 'sub': 'Enter / exit a zone', 'icon': Icons.layers, 'color': AppColors.teal, 'bg': AppColors.bg},
@@ -476,25 +477,17 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
       widget.onCreated();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Alert created and saved to your account')));
     } else {
-      if (_type == 'geofence') {
-        // show what geofence alert types the server actually supports
-        final raw = await ApiService.getAlertAttributesRaw();
-        if (!mounted) return;
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Geofence alert — server types'),
-            content: SingleChildScrollView(child: Text(raw, style: const TextStyle(fontSize: 10))),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
-          ),
-        );
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text((_type == 'powercut' || _type == 'lowbattery')
-            ? 'This alert may not be supported by your device/server'
-            : 'Could not create alert'),
-      ));
+      // show what alert types the server actually supports (helps map correctly)
+      final raw = await ApiService.getAlertAttributesRaw();
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text('${meta['name']} alert — server response'),
+          content: SingleChildScrollView(child: Text('Could not create this alert.\n\nServer supported types & fields:\n\n$raw', style: const TextStyle(fontSize: 10))),
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+        ),
+      );
     }
   }
 
