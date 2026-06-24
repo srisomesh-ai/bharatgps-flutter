@@ -382,10 +382,9 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
     {'t': 'move_duration', 'name': 'Movement', 'sub': 'Moves when parked', 'icon': Icons.trending_flat, 'color': AppColors.blue, 'bg': AppColors.blueBg},
     {'t': 'engine_on', 'name': 'Engine ON', 'sub': 'Ignition turned on', 'icon': Icons.power_settings_new, 'color': AppColors.green, 'bg': AppColors.greenBg},
     {'t': 'engine_off', 'name': 'Engine OFF', 'sub': 'Ignition turned off', 'icon': Icons.power_off, 'color': AppColors.ink2, 'bg': AppColors.bg},
-    {'t': 'offline', 'name': 'Offline', 'sub': 'Device stops reporting', 'icon': Icons.wifi_off, 'color': AppColors.red, 'bg': AppColors.redBg},
-    {'t': 'online', 'name': 'Online', 'sub': 'Device back online', 'icon': Icons.wifi, 'color': AppColors.green, 'bg': AppColors.greenBg},
-    {'t': 'powercut', 'name': 'Power Cut', 'sub': 'GPS unplugged', 'icon': Icons.flash_on, 'color': AppColors.orange, 'bg': AppColors.orangeBg},
-    {'t': 'lowbattery', 'name': 'Low Battery', 'sub': 'Below threshold', 'icon': Icons.battery_alert, 'color': AppColors.violet, 'bg': AppColors.violetBg},
+    {'t': 'offline', 'name': 'Offline / Power Cut', 'sub': 'Device stops reporting', 'icon': Icons.wifi_off, 'color': AppColors.red, 'bg': AppColors.redBg},
+    {'t': 'idle_duration', 'name': 'Idle', 'sub': 'Engine on, not moving', 'icon': Icons.hourglass_empty, 'color': AppColors.orange, 'bg': AppColors.orangeBg},
+    {'t': 'stop_duration', 'name': 'Stopped', 'sub': 'Parked too long', 'icon': Icons.local_parking, 'color': AppColors.violet, 'bg': AppColors.violetBg},
     {'t': 'geofence', 'name': 'Geofence', 'sub': 'Enter / exit a zone', 'icon': Icons.layers, 'color': AppColors.teal, 'bg': AppColors.bg},
   ];
 
@@ -423,9 +422,10 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
     }
   }
 
-  String get _thrUnit => _type == 'overspeed' ? 'km/h' : (_type == 'lowbattery' ? '%' : 'min');
-  // engine on/off and power cut are event-based — no threshold needed
-  bool get _hasThreshold => _type != 'powercut' && _type != 'engine_on' && _type != 'engine_off' && _type != 'geofence';
+  String get _thrUnit => _type == 'overspeed' ? 'km/h' : 'min';
+  // engine on/off and geofence are event-based — no duration threshold needed.
+  // overspeed, movement, offline, idle, stopped all take a numeric threshold.
+  bool get _hasThreshold => _type != 'engine_on' && _type != 'engine_off' && _type != 'geofence';
 
   Widget _dirChip(String label, String val) {
     final sel = _geoDirection == val;
@@ -463,8 +463,8 @@ class _CreateAlertSheetState extends State<_CreateAlertSheet> {
       name: '${meta['name']} Alert',
       devices: _selected.map((e) => int.parse(e)).toList(),
       overspeed: _type == 'overspeed' ? thr : null,
-      moveDuration: _type == 'move_duration' ? thr : (_type == 'offline' ? thr : null),
-      ignitionDuration: _type == 'ignition_duration' ? thr : null,
+      moveDuration: (_type == 'move_duration' || _type == 'offline' || _type == 'idle_duration' || _type == 'stop_duration') ? thr : null,
+      ignitionDuration: (_type == 'ignition_duration' || _type == 'engine_on' || _type == 'engine_off') ? thr : null,
       geofenceId: _type == 'geofence' ? _selectedGeofenceId : null,
       geofenceDirection: _type == 'geofence' ? _geoDirection : null,
     );
