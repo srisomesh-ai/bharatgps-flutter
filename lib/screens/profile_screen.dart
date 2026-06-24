@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'help_support_screen.dart';
 import 'tour_keys.dart';
 import 'main_shell.dart';
 import '../services/api_service.dart';
@@ -215,7 +216,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         KeyedSubtree(key: TourKeys.profileStore, child: _menu(Icons.storefront, 'Store & Services', 'Buy GPS, renew plans, request services', onTap: () { Haptics.light(); Navigator.push(context, MaterialPageRoute(builder: (_) => const StoreScreen())); })),
                         _menu(Icons.notifications_none, 'Notification Settings', 'Manage alert preferences', onTap: () { Haptics.light(); Navigator.pushNamed(context, '/notification-settings'); }),
                         _menu(Icons.shield_outlined, 'Security', 'Change password and security'),
-                        _menu(Icons.help_outline, 'Help & Support', 'FAQs, guides and contact support'),
+                        _menu(Icons.help_outline, 'Help & Support', 'FAQs, guides and contact support', onTap: () { Haptics.light(); Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportScreen())); }),
                         _menu(Icons.info_outline, 'About Bharat GPS Tracker', 'App version and information', last: true, onTap: _showAbout),
                       ]),
                     ),
