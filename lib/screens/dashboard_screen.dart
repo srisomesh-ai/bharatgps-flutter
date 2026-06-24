@@ -41,11 +41,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final d = await ApiService.getDevices();
       if (!mounted) return;
+      // carry over addresses we already resolved so they don't vanish on refresh
+      final addrById = {for (final u in _devices) '${u['id']}': u['address']};
+      for (final u in d) {
+        final prev = addrById['${u['id']}'];
+        if ((u['address'] ?? '').toString().isEmpty && prev != null && '$prev'.isNotEmpty) {
+          u['address'] = prev;
+        }
+      }
       setState(() {
         _devices = d;
         _loading = false;
       });
-      if (!silent) _resolveAddresses(d);
+      _resolveAddresses(d); // resolve any still-missing addresses every load
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
