@@ -159,10 +159,13 @@ class NotificationService {
   }
 
   static Future<void> _showFromMessage(RemoteMessage m) async {
-    final sound = await currentSound();
     final n = m.notification;
     final title = n?.title ?? m.data['title'] ?? 'BharatGPS Alert';
     final body = n?.body ?? m.data['body'] ?? '';
+    // pick the sound chosen for THIS alert type (not the global one).
+    // type can come from the push data, else guess from the text.
+    final type = (m.data['type'] ?? m.data['alert_type'] ?? _guessAlertType('$title $body'))?.toString();
+    final sound = (type != null && type.isNotEmpty) ? await soundForType(type) : await currentSound();
     final details = AndroidNotificationDetails(
       'bgps_alerts_${sound.id}',
       'Alerts — ${sound.label}',
