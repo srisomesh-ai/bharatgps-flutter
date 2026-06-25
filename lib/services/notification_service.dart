@@ -256,7 +256,11 @@ class NotificationService {
   static void startEventPolling() {
     _pollTimer?.cancel();
     _primed = false;
+    _statesPrimed = false;
     _seenEvents.clear();
+    _lastMotion.clear();
+    _lastCharge.clear();
+    _lastIgnition.clear();
     _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _checkEvents());
     _checkEvents();
   }
@@ -291,6 +295,99 @@ class NotificationService {
         _seenEvents.add(id);
         final msg = (e['message'] ?? 'Vehicle alert').toString();
         await _showLocal(msg, (e['address'] ?? '').toString(), type: _guessAlertType(msg));
+      }
+    } catch (_) {}
+    // also detect motion / power / ignition changes directly from device data
+    await _checkDeviceStates();
+  }
+
+  // ===== App-side detection of motion, power (charge) and ignition =====
+  // Watches each device's live values and notifies when they change. This makes
+  // Movement, Power Cut and Engine ON/OFF alerts work without server alert types.
+  static final Map<String, String> _lastMotion = {};
+  static final Map<String, String> _lastCharge = {};
+  static final Map<String, String> _lastIgnition = {};
+  static bool _statesPrimed = false;
+
+  // per-type enable flags (default ON). Pref keys: bgps_detect_<type>
+  static Future<bool> _detectEnabled(String type) async {
+    final p = await SharedPreferences.getInstance();
+    return p.getBool('bgps_detect_$type') ?? true;
+  }
+
+  static Future<void> setDetectEnabled(String type, bool on) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('bgps_detect_$type', on);
+  }
+
+  static String _b(dynamic v) {
+    final s = '$v'.trim().toLowerCase();
+    if (s == 'true' || s == '1') return 'true';
+    if (s == 'false' || s == '0') return 'false';
+    return '';
+  }
+
+  static Future<void> _checkDeviceStates() async {
+    if (!ApiService.isLoggedIn) return;
+    try {
+      final devices = await ApiService.getDevices();
+      // first pass: just record current states, don't notify (avoids a burst)
+      if (!_statesPrimed) {
+        for (final d in devices) {
+          final id = '${d['id']}';
+          final ts = (d['ts'] is Map) ? d['ts'] as Map : const {};
+          _lastMotion[id] = _b(ts['motion']);
+          _lastCharge[id] = _b(ts['charge']);
+          _lastIgnition[id] = _b(ts['ignition']);
+        }
+        _statesPrimed = true;
+        return;
+      }
+
+      for (final d in devices) {
+        final id = '${d['id']}';
+        final name = '${d['name'] ?? 'Vehicle'}';
+        final ts = (d['ts'] is Map) ? d['ts'] as Map : const {};
+        final motion = _b(ts['motion']);
+        final charge = _b(ts['charge']);
+        final ign = _b(ts['ignition']);
+
+        // MOVEMENT: motion false -> true
+        final pm = _lastMotion[id];
+        if (motion.isNotEmpty && pm != null && pm.isNotEmpty && motion != pm) {
+          if (motion == 'true' && await _detectEnabled('move_duration')) {
+            await _showLocal('$name started moving', 'Vehicle is now in motion', type: 'move_duration');
+          }
+          _lastMotion[id] = motion;
+        } else if (motion.isNotEmpty) {
+          _lastMotion[id] = motion;
+        }
+
+        // POWER CUT: charge true -> false (power disconnected)
+        final pc = _lastCharge[id];
+        if (charge.isNotEmpty && pc != null && pc.isNotEmpty && charge != pc) {
+          if (charge == 'false' && await _detectEnabled('powercut')) {
+            await _showLocal('$name power disconnected', 'GPS device main power was cut', type: 'powercut');
+          } else if (charge == 'true' && await _detectEnabled('powercut')) {
+            await _showLocal('$name power restored', 'GPS device main power is back', type: 'powercut');
+          }
+          _lastCharge[id] = charge;
+        } else if (charge.isNotEmpty) {
+          _lastCharge[id] = charge;
+        }
+
+        // IGNITION: on/off change
+        final pi = _lastIgnition[id];
+        if (ign.isNotEmpty && pi != null && pi.isNotEmpty && ign != pi) {
+          if (ign == 'true' && await _detectEnabled('engine_on')) {
+            await _showLocal('$name engine ON', 'Ignition turned on', type: 'engine_on');
+          } else if (ign == 'false' && await _detectEnabled('engine_off')) {
+            await _showLocal('$name engine OFF', 'Ignition turned off', type: 'engine_off');
+          }
+          _lastIgnition[id] = ign;
+        } else if (ign.isNotEmpty) {
+          _lastIgnition[id] = ign;
+        }
       }
     } catch (_) {}
   }
