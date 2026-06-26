@@ -330,7 +330,11 @@ class NotificationService {
   static Future<void> _checkDeviceStates() async {
     if (!ApiService.isLoggedIn) return;
     try {
-      final devices = await ApiService.getDevices();
+      // reuse the devices the map/dashboard already fetched — do NOT make a
+      // separate get_devices call (that doubled server load and caused slow
+      // loading). If nothing is cached yet, skip this round.
+      final devices = ApiService.cachedDevices;
+      if (devices.isEmpty) return;
       // first pass: just record current states, don't notify (avoids a burst)
       if (!_statesPrimed) {
         for (final d in devices) {
