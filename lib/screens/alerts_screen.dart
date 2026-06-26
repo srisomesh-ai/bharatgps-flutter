@@ -241,17 +241,20 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
   Widget _historyTab() {
     if (_loadingEvents) return const Center(child: CircularProgressIndicator(color: AppColors.teal));
     if (_events.isEmpty) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.history, size: 50, color: AppColors.muted),
-          const SizedBox(height: 12),
-          const Text('No events yet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
-            child: Text('Triggered alerts from the last 7 days appear here. An alert must actually fire (a vehicle does the thing) to create an event.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: AppColors.muted)),
-          ),
-        ]),
-      );
+      return Column(children: [
+        _historyRefreshBar(),
+        Expanded(child: Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.history, size: 50, color: AppColors.muted),
+            const SizedBox(height: 12),
+            const Text('No events yet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 40),
+              child: Text('Triggered alerts from the last 7 days appear here. An alert must actually fire (a vehicle does the thing) to create an event.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: AppColors.muted)),
+            ),
+          ]),
+        )),
+      ]);
     }
     String lastDay = '';
     final items = <Widget>[];
@@ -267,7 +270,10 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
       final color = m['color'] as Color;
       final bg = m['bg'] as Color;
       final addr = (e['address'] ?? '').toString();
-      final spd = e['speed'] != null ? ' · ${(e['speed'] as num).round()} km/h' : '';
+      // only show speed for over-speed alerts (and only when > 0)
+      final spd = (t == 'overspeed' && e['speed'] is num && (e['speed'] as num) > 0)
+          ? ' · ${(e['speed'] as num).round()} km/h'
+          : '';
       items.add(Container(
         margin: const EdgeInsets.only(bottom: 11),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: const [BoxShadow(color: Color(0x120E5C5C), blurRadius: 10)]),
@@ -314,7 +320,33 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
         ),
       ));
     }
-    return ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 16), children: items);
+    return Column(children: [
+      _historyRefreshBar(),
+      Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 16), children: items)),
+    ]);
+  }
+
+  Widget _historyRefreshBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+      child: Row(children: [
+        Text(_events.isEmpty ? 'Alert History' : '${_events.length} event${_events.length == 1 ? '' : 's'} · last 7 days',
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.ink2)),
+        const Spacer(),
+        GestureDetector(
+          onTap: _loadingEvents ? null : () { Haptics.light(); _loadEvents(); },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+            decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: const [
+              Icon(Icons.refresh, size: 15, color: AppColors.teal),
+              SizedBox(width: 5),
+              Text('Refresh', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.teal)),
+            ]),
+          ),
+        ),
+      ]),
+    );
   }
 
   String _guessType(String msg) {
