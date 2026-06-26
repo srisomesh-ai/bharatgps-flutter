@@ -124,34 +124,8 @@ class ApiService {
   /// DEVICES — flattened list.
   // last successful device list — lets screens render instantly while refreshing
   static List<Map<String, dynamic>> cachedDevices = [];
-  static DateTime? _devicesFetchedAt;
-  static Future<List<Map<String, dynamic>>>? _devicesInFlight;
-  // how long a fresh device fetch is reused before hitting the server again.
-  // The map refreshes every 5s, so 3s lets several screens share one call
-  // without ever making the data feel stale.
-  static const Duration _devicesTtl = Duration(seconds: 3);
 
-  static Future<List<Map<String, dynamic>>> getDevices({bool force = false}) async {
-    // 1) reuse a very recent result (any screen that just fetched)
-    if (!force && _devicesFetchedAt != null && cachedDevices.isNotEmpty &&
-        DateTime.now().difference(_devicesFetchedAt!) < _devicesTtl) {
-      return cachedDevices;
-    }
-    // 2) if a fetch is already running, wait for that ONE instead of starting another
-    if (!force && _devicesInFlight != null) {
-      return _devicesInFlight!;
-    }
-    // 3) start a single fetch that all concurrent callers share
-    final future = _fetchDevices();
-    _devicesInFlight = future;
-    try {
-      return await future;
-    } finally {
-      _devicesInFlight = null;
-    }
-  }
-
-  static Future<List<Map<String, dynamic>>> _fetchDevices() async {
+  static Future<List<Map<String, dynamic>>> getDevices() async {
     final res = await http.get(_u(host!, 'get_devices', {
       'lang': 'en',
       'user_api_hash': hash!,
@@ -169,10 +143,7 @@ class ApiService {
         }
       }
     }
-    if (out.isNotEmpty) {
-      cachedDevices = out;
-      _devicesFetchedAt = DateTime.now();
-    }
+    if (out.isNotEmpty) cachedDevices = out;
     return out;
   }
 
