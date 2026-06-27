@@ -147,6 +147,99 @@ class ApiService {
     return out;
   }
 
+  // ===== Lighter live-update endpoints (reduce server load) =====
+  // get_devices_latest returns the same fields as get_devices but is lighter.
+  // Used for the periodic "all devices" refresh (every 30s) and, with
+  // filter[id], for fast single-vehicle tracking (every ~8s).
+
+  /// All devices' latest position/status. Lighter than get_devices.
+  /// Merges into cachedDevices so sensors/expiry from the full launch fetch
+  /// are preserved (latest only updates position/speed/status/ts).
+  static Future<List<Map<String, dynamic>>> getDevicesLatest() async {
+    try {
+      final res = await http.get(_u(host!, 'get_devices_latest', {
+        'lang': 'en',
+        'user_api_hash': hash!,
+      })).timeout(const Duration(seconds: 20));
+      if (res.statusCode != 200) return cachedDevices;
+      final j = jsonDecode(res.body);
+      final items = (j is Map && j['items'] is List)
+          ? j['items'] as List
+          : (j is List ? j : const []);
+      if (items.isEmpty) return cachedDevices;
+      final fresh = <Map<String, dynamic>>[];
+      for (final d in items) {
+        if (d is Map) fresh.add(_mapDevice(Map<String, dynamic>.from(d)));
+      }
+      if (fresh.isNotEmpty) {
+        _mergeLatest(fresh);
+      }
+      return cachedDevices;
+    } catch (_) {
+      return cachedDevices;
+    }
+  }
+
+  /// One device's latest data (filter[id]). For fast selected-vehicle tracking.
+  static Future<Map<String, dynamic>?> getDeviceLatest(dynamic deviceId) async {
+    try {
+      final res = await http.get(_u(host!, 'get_devices_latest', {
+        'lang': 'en',
+        'user_api_hash': hash!,
+        'filter[id]': '$deviceId',
+      })).timeout(const Duration(seconds: 15));
+      if (res.statusCode != 200) return null;
+      final j = jsonDecode(res.body);
+      final items = (j is Map && j['items'] is List)
+          ? j['items'] as List
+          : (j is List ? j : const []);
+      for (final d in items) {
+        if (d is Map && '${d['id']}' == '$deviceId') {
+          final mapped = _mapDevice(Map<String, dynamic>.from(d));
+          _mergeLatest([mapped]);
+          return mapped;
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Merge fresh latest-data into cachedDevices by id. Preserves fields that
+  /// the latest endpoint may not carry (keeps the device list stable for the
+  /// map's glide, which reads from this same list).
+  static void _mergeLatest(List<Map<String, dynamic>> fresh) {
+    if (cachedDevices.isEmpty) {
+      cachedDevices = fresh;
+      return;
+    }
+    final byId = {for (final u in cachedDevices) '${u['id']}': u};
+    for (final f in fresh) {
+      final id = '${f['id']}';
+      final existing = byId[id];
+      if (existing == null) {
+        cachedDevices.add(f);
+        continue;
+      }
+      // update the live fields; keep expiry/hasCutSensor from the full fetch
+      // if the latest one came back empty (defensive).
+      existing['online'] = f['online'];
+      existing['speed'] = f['speed'];
+      existing['lat'] = f['lat'];
+      existing['lng'] = f['lng'];
+      existing['time'] = f['time'];
+      existing['course'] = f['course'];
+      existing['expired'] = f['expired'];
+      if ((f['address'] ?? '').toString().isNotEmpty) existing['address'] = f['address'];
+      if (f['tail'] is List && (f['tail'] as List).isNotEmpty) existing['tail'] = f['tail'];
+      existing['ts'] = f['ts'];
+      // keep hasCutSensor/expiry from the original full fetch if latest lacks them
+      if (f['hasCutSensor'] == true) existing['hasCutSensor'] = true;
+      if ((f['expiry'] ?? '').toString().isNotEmpty) existing['expiry'] = f['expiry'];
+    }
+  }
+
   static Map<String, dynamic> _mapDevice(Map<String, dynamic> d) {
     final dd = (d['device_data'] is Map) ? Map<String, dynamic>.from(d['device_data']) : {};
     final tr = (dd['traccar'] is Map) ? Map<String, dynamic>.from(dd['traccar']) : {};
