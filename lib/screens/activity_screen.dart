@@ -31,9 +31,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
       _loading = false;
     }
     _load();
-    // keep fleet activity live, matching the map's 5s refresh
-    _refresh = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (MainShell.currentTab.value == 1) _load();
+    // fleet activity refresh every 30s (lighter latest endpoint), only when visible
+    _refresh = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (MainShell.currentTab.value == 1) _load(silent: true);
     });
   }
 
@@ -43,9 +43,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    final d = await ApiService.getDevices();
-    if (!mounted) return;
+  Future<void> _load({bool silent = false}) async {
+    final d = silent ? await ApiService.getDevicesLatest() : await ApiService.getDevices();
+    if (!mounted || d.isEmpty) return;
     setState(() {
       _devices = d
         ..sort((a, b) => '${a['name']}'.toLowerCase().compareTo('${b['name']}'.toLowerCase()));
