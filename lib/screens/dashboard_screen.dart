@@ -29,7 +29,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _load();
     // poll every 10s, but ONLY when the Dashboard tab is the visible one
     // (reduces server load — hidden tabs don't call the server)
-    _refresh = Timer.periodic(const Duration(seconds: 10), (_) {
+    _refresh = Timer.periodic(const Duration(seconds: 30), (_) {
       if (MainShell.currentTab.value == 0) _load(silent: true);
     });
   }
@@ -42,8 +42,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _load({bool silent = false}) async {
     try {
-      final d = await ApiService.getDevices();
-      if (!mounted) return;
+      // first load = full get_devices; periodic refresh = lighter get_devices_latest
+      final d = silent ? await ApiService.getDevicesLatest() : await ApiService.getDevices();
+      if (!mounted || d.isEmpty) return;
       // carry over addresses we already resolved so they don't vanish on refresh
       final addrById = {for (final u in _devices) '${u['id']}': u['address']};
       for (final u in d) {
