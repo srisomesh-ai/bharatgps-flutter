@@ -37,6 +37,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   LatLng? _userLocation; // phone GPS position
   Map<String, dynamic>? _selected; // for the mini-card
   Timer? _refresh;
+  Timer? _selectedRefresh;
   final Map<String, String> _addrCache = {};
 
   // ===== glide engine state =====
@@ -62,11 +63,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     // seed focus from any pending request (e.g. tapped from dashboard)
     _focusId = MainShell.mapFocusId.value;
     MainShell.mapFocusId.addListener(_onFocusRequested);
-    _load();
+    _load(); // full get_devices once at launch (sensors, expiry, hasCutSensor)
     _loadGprs();
-    _refresh = Timer.periodic(const Duration(seconds: 5), (_) {
-      // only hit the server while the Map tab is actually visible
-      if (MainShell.currentTab.value == 2) _load(silent: true);
+    // ALL devices: lighter refresh every 30s (only while Map tab visible)
+    _refresh = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (MainShell.currentTab.value == 2) _loadLatest();
+    });
+    // SELECTED vehicle: fast single-device refresh every 8s (only when one is
+    // selected and the Map tab is visible) — keeps live tracking responsive
+    // without pulling all devices every few seconds.
+    _selectedRefresh = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (MainShell.currentTab.value == 2 && _selected != null) _loadSelectedLatest();
     });
     _ticker = createTicker(_onTick)..start();
   }
@@ -129,6 +136,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   void dispose() {
     MainShell.mapFocusId.removeListener(_onFocusRequested);
     _refresh?.cancel();
+    _selectedRefresh?.cancel();
     _ticker?.dispose();
     super.dispose();
   }
@@ -142,6 +150,29 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Future<void> _load({bool silent = false}) async {
     final d = await ApiService.getDevices();
     if (!mounted) return;
+    _applyDeviceUpdate(d, silent: silent);
+  }
+
+  // Lighter refresh for ALL devices (every 30s) via get_devices_latest.
+  Future<void> _loadLatest() async {
+    final d = await ApiService.getDevicesLatest();
+    if (!mounted || d.isEmpty) return;
+    _applyDeviceUpdate(d, silent: true);
+  }
+
+  // Fast refresh for the SELECTED vehicle only (every ~8s) via filter[id].
+  Future<void> _loadSelectedLatest() async {
+    final sel = _selected;
+    if (sel == null) return;
+    final one = await ApiService.getDeviceLatest(sel['id']);
+    if (!mounted || one == null) return;
+    // the merge already updated cachedDevices; apply the full list so the glide
+    // for this vehicle updates smoothly (others keep their last known position)
+    _applyDeviceUpdate(ApiService.cachedDevices, silent: true);
+  }
+
+  // Shared glide/update logic — used by full load, latest-all, and latest-one.
+  void _applyDeviceUpdate(List<Map<String, dynamic>> d, {bool silent = false}) {
     // keep the selected vehicle's reference fresh
     if (_selected != null) {
       final match = d.firstWhere((e) => '${e['id']}' == '${_selected!['id']}', orElse: () => {});
